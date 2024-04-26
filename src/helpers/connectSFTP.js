@@ -1,5 +1,5 @@
 const Client = require("ssh2-sftp-client");
-const connSFTP = require('../configs/sftpConnect');
+const connSFTP = require('../configs/sftp');
 
 class SFTP {
     constructor(options) {
