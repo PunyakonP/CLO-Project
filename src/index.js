@@ -1,6 +1,6 @@
 require('dotenv').config();
 const Logger = require('./helpers/Logger');
-const MssqlConnection = require('./helpers/MSSqlConnection');
+const MssqlConnection = require('./helpers/MssqlConnection');
 
 (async () => {
   try {
@@ -67,6 +67,6 @@ app.use(API_PREFIX, router);
  */
 app.use(errorHandler);
 
-app.listen(PORT,() => {
+app.listen(PORT, () => {
   Logger.debug(`✅ App is running at http://${HOST}:${PORT}/ in ${ENV} mode`, { HOST, PORT, ENV });
 })
