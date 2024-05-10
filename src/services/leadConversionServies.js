@@ -30,9 +30,9 @@ async function getQuerifiedLead() {
     }
     Logger.info(`QuerifiedLead count: ${result.recordset.length}`)
     const mapQuelifiedLead = await mapDataForMeta('qualified', result.recordset);
-    // console.log('timestamp', mapQuelifiedLead.length);
+    console.log('timestamp', mapQuelifiedLead);
 
-    let responseBooking = [
+    let quelified = [
         {
             "event_name": "qualified",
             "event_time": 1714459338,
@@ -69,82 +69,97 @@ async function getQuerifiedLead() {
             }
         }
     ]
+
+    const url = 'https://graph.facebook.com/v19.0/1618011605605581/events?access_token=EAAMgDW042TwBO5tXy7hazTZAWIBIApZCGRd1bfDFh6wE9ZBVGmqlCK3AKMrMPm9b1t8XdxwZBlyIqVwkE8CklgXUVlHF1N2Mnrmkn10Y60TgSBQtaWkEETfqvsX0SLwyuBZAb5jAk5eFDBMZA4yTDiityZAuhVowNIuXXhJPZCbXH9SbfcSoYx7blUgAxOuKEHiprwZDZD'
+
     let indexs = 0
     try {
-        // console.log('testttt', responseBooking.length);
-        for (i = 0; i < responseBooking.length; i++) {
+        // console.log('testttt', quelified.length);
+        for (i = 0; i < mapQuelifiedLead.length; i++) {
             indexs = i
 
-            // console.log('test', responseBooking[i]);
-            await http.post(`/events${queryParams}`, {
+            // console.log('test', mapQuelifiedLead[i]);
+            const res = await axios.post(url, {
                 "data": [
-                    responseBooking[i]
+                    {
+                        "event_name": "qualified",
+                        "event_time": mapQuelifiedLead[i].event_time,
+                        "action_source": "system_generated",
+                        "user_data": {
+                            "lead_id": mapQuelifiedLead[i].user_data.lead_id
+                        },
+                        "custom_data": {
+                            "event_source": "crm",
+                            "lead_event_source": "toyota crm"
+                        }
+                    }
                 ]
             })
+            console.log(res);
             //to do make logging
-            Logger.info(`Send request Quelified lead(${responseBooking[i].user_data.lead_id}) at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)} `);
+            Logger.info(`Send request mapQuelifiedLead lead(${mapQuelifiedLead[i].user_data.lead_id}) at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)} `);
         }
         Logger.debug('All request is success')
-        // console.log('qwwqwq', responseBooking);
+        // console.log('qwwqwq', mapQuelifiedLead);
         return true;
     }
     catch (error) {
         // console.log('err', error);
         Logger.error(`⚠ Failed to request data`)
         //to do make cashe Redis
-        for (i = indexs; i < responseBooking.length; i++) {
-            const checkDuplicate = CacheData.getData(responseBooking[i].user_data.lead_id)
-            if (checkDuplicate) {
-                Logger.warning(`This leadi_id: ${responseBooking[i].user_data.lead_id} is exist in cached`);
-            } else {
-                const recoveryData = { key: `${responseBooking[i].user_data.lead_id}`, value: JSON.stringify(responseBooking[i]) }
-                await CacheData.setData(recoveryData);
-            }
-        }
-        Logger.info(`Saved cache successfully at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)} `);
+        // for (i = indexs; i < mapQuelifiedLead.length; i++) {
+        //     const checkDuplicate = CacheData.getData(mapQuelifiedLead[i].user_data.lead_id)
+        //     if (checkDuplicate) {
+        //         Logger.warning(`This leadi_id: ${mapQuelifiedLead[i].user_data.lead_id} is exist in cached`);
+        //     } else {
+        //         const recoveryData = { key: `${mapQuelifiedLead[i].user_data.lead_id}`, value: JSON.stringify(mapQuelifiedLead[i]) }
+        //         await CacheData.setData(recoveryData);
+        //     }
+        // }
+        // Logger.info(`Saved cache successfully at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)} `);
         throw error
     }
 }
-/**
- * request Data per lead
- * @param {} data 
- * @returns 
- */
-async function multiRequestHttp(data) {
-    const queryParams = `?access_token=${process.env.ACCESS_TOKEN_FACEBOOK}`
-    let indexs = 0
-    try {
-        for (i = 0; i < data.length; i++) {
-            indexs = i
+// /**
+//  * request Data per lead
+//  * @param {} data 
+//  * @returns 
+//  */
+// async function multiRequestHttp(data) {
+//     const queryParams = `?access_token=${process.env.ACCESS_TOKEN_FACEBOOK}`
+//     let indexs = 0
+//     try {
+//         for (i = 0; i < data.length; i++) {
+//             indexs = i
 
-            await http.post(`/events${queryParams}`, {
-                "data": [
-                    data[i]
-                ]
-            })
-            //to do make logging
-            Logger.info(`Send request ${data[i].event_name} lead(${data[i].user_data.lead_id}) at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)} `);
-        }
-        Logger.debug('All request is success')
-        return true;
-    }
-    catch (error) {
-        // console.log('err', error);
-        Logger.error(`⚠ Failed to request data`)
-        //to do make cashe Redis
-        for (i = indexs; i < data.length; i++) {
-            const checkDuplicate = CacheData.getData(data[i].user_data.lead_id)
-            if (checkDuplicate) {
-                Logger.warning(`This leadi_id: ${data[i].user_data.lead_id} is exist in cached`);
-            } else {
-                const recoveryData = { key: `${data[i].user_data.lead_id}`, value: JSON.stringify(data[i]) }
-                await CacheData.setData(recoveryData);
-            }
-        }
-        Logger.info(`Saved cache successfully at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)} `);
-        throw error
-    }
-}
+//             await http.post(`/events${queryParams}`, {
+//                 "data": [
+//                     data[i]
+//                 ]
+//             })
+//             //to do make logging
+//             Logger.info(`Send request ${data[i].event_name} lead(${data[i].user_data.lead_id}) at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)} `);
+//         }
+//         Logger.debug('All request is success')
+//         return true;
+//     }
+//     catch (error) {
+//         // console.log('err', error);
+//         Logger.error(`⚠ Failed to request data`)
+//         //to do make cashe Redis
+//         for (i = indexs; i < data.length; i++) {
+//             const checkDuplicate = CacheData.getData(data[i].user_data.lead_id)
+//             if (checkDuplicate) {
+//                 Logger.warning(`This leadi_id: ${data[i].user_data.lead_id} is exist in cached`);
+//             } else {
+//                 const recoveryData = { key: `${data[i].user_data.lead_id}`, value: JSON.stringify(data[i]) }
+//                 await CacheData.setData(recoveryData);
+//             }
+//         }
+//         Logger.info(`Saved cache successfully at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)} `);
+//         throw error
+//     }
+// }
 
 async function getRawLead(data) {
     if (!data) {
@@ -154,7 +169,7 @@ async function getRawLead(data) {
     const mapRawLead = await mapDataForMeta('initial_lead', data);
     const queryParams = `?access_token=${process.env.ACCESS_TOKEN_FACEBOOK}`
     try {
-        const responseRawLead = await http.post(`/events${queryParams}`, { data: mapRawLead })
+        const responseRawLead = await axios.post(`/events${queryParams}`, { data: mapRawLead })
         //to do make logging
         Logger.info(`Send request at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)}`)
         return responseRawLead;

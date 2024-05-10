@@ -3,12 +3,13 @@ const { runValidation } = require('../helpers/runValidation');
 const { success } = require('../helpers/response');
 const Logger = require('../helpers/Logger');
 
+
 exports.getApiIdentity = async (req, res, next) => {
   try {
     const request = await runValidation({}, joi.object());
 
     const result = 'TCAP Api to meta.';
-
+    
     Logger.info(`Successfully get API identity: ${result}`, {
       result,
       request,

@@ -2,6 +2,7 @@ require('dotenv').config();
 const Logger = require('./helpers/Logger');
 const MssqlConnection = require('./helpers/MssqlConnection');
 
+
 (async () => {
   try {
     await MssqlConnection.connect();
