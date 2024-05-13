@@ -1,11 +1,41 @@
 // genarate exprees app
 const express = require('express');
+const { HttpClient } = require('./src/lib')
+require('dotenv').config()
+const http = new HttpClient({
+  baseURL: process.env.BASE_URL_FACEBOOK
+})
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+async function test() {
+  const responseBooking = await http.post(`${process.env.BASE_URL_FACEBOOK}/${process.env.VERSION_API_FACEBOOK}/${process.env.APP_ID}/events`, {
+    "data": [
+      {
+        "event_name": "purchase",
+        "event_time": 1629424350,
+        "action_source": "system_generated",
+        "user_data": {
+          "lead_id": 525645896321548
+        },
+        "custom_data": {
+          "event_source": "crm",
+          "lead_event_source": "toyota_crm"
+        }
+      }
+    ]
+  }
+    , {
+      params: {
+        access_token: process.env.ACCESS_TOKEN_FACEBOOK
+      }
+    })
 
+  console.log(responseBooking);
+}
+test().then(() => console.log)
 app.get("/webhook", async (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
