@@ -20,24 +20,26 @@ async function readFile(eventName) {
   Logger.debug(`Start connecting SFTP`);
   await SFTP.connect();
   Logger.debug(`Connected SFTP successful`);
-
-  // todo waiting path from tdem
   const pathDir = process.env.SFTP_PATH;
-  const checkFolderExist = await SFTP.exist(pathDir);
-  if (!checkFolderExist) {
-    Logger.warning(`Directory is not exist ${pathDir}`);
+
+
+  const checkFolderPath = await SFTP.exist(pathDir);
+  if (!checkFolderPath) {
+    Logger.warning(`Directory is not exist ${pathDir}, ${checkFolderPath}`);
     return false;
   }
 
-  if (eventName === "booking") {
-    await bookingLead();
-  } else {
-    await deliveryLead();
+  if (eventName !== "booking") {
+    const delivery = await deliveryLead();
+    await SFTP.close();
+    Logger.info(`Close connection SFTP`)
+    return delivery;
   }
 
+  const booking = await bookingLead();
   await SFTP.close();
   Logger.info(`Close connection SFTP`)
-  return;
+  return booking
 }
 
 async function findAllBooking () {
@@ -101,6 +103,13 @@ function determineCheckDate(lastTransfer, fallbackDate) {
 }
 
 async function processBookingRequests (mappedBookings) {
+  const result = {
+    message: "",
+    response: {
+      success: [],
+      failed: []
+    }
+  }
   const queryParams = `?access_token=${process.env.ACCESS_TOKEN_FACEBOOK}`;
   let success = 0;
   let failed = 0;
@@ -109,14 +118,19 @@ async function processBookingRequests (mappedBookings) {
     const response = await sendBookingRequest(booking, queryParams)
     if (response.status == 200) {
       success++;
+      result.response.success.push(booking);
       Logger.info(`Send request ${booking.event_name} lead(${booking.user_data.lead_id}) at ${getCurrentTimestamp()}`);
     } else {
       failed++;
+      result.response.failed.push(booking);
       Logger.error(`Failed to request data: ${JSON.stringify(booking)} \nException : ${JSON.stringify(response.response.data)}`);
     }
   }
 
-  return {success, failed}
+  const message = `All request quelified Lead is success => ${success}, is failed => ${failed}`
+  result.message = message;
+
+  return result
 }
 
 async function sendBookingRequest (booking, queryParams) {
@@ -147,41 +161,42 @@ async function bookingLead() {
       type: "lasted",
     });
     const checkDate = determineCheckDate(lastTransfer, currentDete);
-    console.log(checkDate , currentDete);
+    console.log(checkDate, currentDete)
     if (checkDate < currentDete) {
       Logger.debug(`Process recovery starting`);
       const resultRecovery = await recoveryService.recoveryBooking();
       if (resultRecovery == false) {
         Logger.error("Error recovery processing");
+        return "Error recovery processing"
       }
       Logger.info(`Recovery successed`);
-      return true;
+      return resultRecovery;
     }
     const bookingFindName = findMatchingBooking(dataListBooking, checkDate);
   
     if (!bookingFindName) {
-      Logger.warning(`Lead not found in SFTP at ${getCurrentTimestamp()}`);
-      return false
+      Logger.warning(`Booking file name not found in SFTP at ${getCurrentTimestamp()}`);
+      return `Booking file name not found in SFTP at ${getCurrentTimestamp()}`
     }
   
     const fileContent = await findBookFile(bookingFindName)
     if (!fileContent) {
       Logger.warning("Unable to read data from SFTP")
-      return false
+      return 'Unable to read data from SFTP'
     }
   
     const mappedBookings = await mapDataForMetaBooking(fileContent, "booking")
     if (!mappedBookings || mappedBookings.length <= 0) {
       const value = `This booking: ${bookingFindName} is emtry data at: ${moment().format('DD-MM-YYYY HH:mm:ss')}`
       await saveTransferRecord(bookingFindName, lastTransfer, value)
-      return true
+      return value
     }
   
-    const {success, failed} = await processBookingRequests(mappedBookings)
-    const valueMessage = `All request quelified Lead is success => ${success}, is failed => ${failed}`
+    const result = await processBookingRequests(mappedBookings)
     await saveTransferRecord(bookingFindName, lastTransfer, valueMessage)
-    Logger.info(valueMessage)
-    return true
+    Logger.info(result.message)
+    return result
+  
   } catch (error) {
     Logger.error(`Error during booking lead process: ${error}`);
     return false;
@@ -260,6 +275,13 @@ function findMatchingDelivery(dataList, checkDate) {
 }
 
 async function processDeliveryRequests (mappedDeliverys) {
+  const result = {
+    message: "",
+    response: {
+      success: [],
+      failed: []
+    }
+  }
   const queryParams = `?access_token=${process.env.ACCESS_TOKEN_FACEBOOK}`;
   let success = 0;
   let failed = 0;
@@ -268,14 +290,18 @@ async function processDeliveryRequests (mappedDeliverys) {
     const response = await sendDeliveryRequest(delivery, queryParams)
     if (response.status == 200) {
       success++;
+      result.response.success.push(delivery)
       Logger.info(`Send request ${delivery.event_name} lead(${delivery.user_data.lead_id}) at ${getCurrentTimestamp()}`);
     } else {
       failed++;
+      result.response.failed.push(delivery)
       Logger.error(`Failed to request data: ${JSON.stringify(delivery)} \nException : ${JSON.stringify(response.response.data)}`);
     }
   }
 
-  return {success, failed}
+  const message = `All request quelified Lead is success => ${success}, is failed => ${failed}`
+  result.message = message;
+  return result
 }
 
 async function sendDeliveryRequest (delivery, queryParams) {
@@ -318,33 +344,32 @@ async function deliveryLead() {
         Logger.error("Error recovery processing");
       }
       Logger.info(`Recovery successed`);
-      return true;
+      return resultRecovery;
     }
     const deliveryFindName = findMatchingDelivery(dataListDelivery, checkDate);
   
     if (!deliveryFindName) {
-      Logger.warning(`Lead not found in SFTP at ${getCurrentTimestamp()}`);
-      return false
+      Logger.warning(`Delivery file name not found in SFTP at ${getCurrentTimestamp()}`);
+      return `Delivery file name not found in SFTP at ${getCurrentTimestamp()}`
     }
   
     const fileContent = await findDeliveryFile(deliveryFindName)
     if (!fileContent) {
       Logger.warning("Unable to read data from SFTP")
-      return false
+      return "Unable to read data from SFTP"
     }
   
     const mappedDeliverys = await mapDataForMetaDelivery(fileContent, "delivery")
     if (!mappedDeliverys || mappedDeliverys.length <= 0) {
       const value = `This delivery: ${deliveryFindName} is emtry data at: ${moment().format('DD-MM-YYYY HH:mm:ss')}`
       await saveTransferDelivery(deliveryFindName, lastTransfer, value)
-      return true
+      return value
     }
   
-    const {success, failed} = await processDeliveryRequests(mappedDeliverys)
-    const valueMessage = `All request quelified Lead is success => ${success}, is failed => ${failed}`
+    const result = await processDeliveryRequests(mappedDeliverys)
     await saveTransferDelivery(deliveryFindName, lastTransfer, valueMessage)
-    Logger.info(valueMessage)
-    return true
+    Logger.info(result.message)
+    return result
   } catch (error) {
     Logger.error(`Error during delivery lead process: ${error}`);
     return false;

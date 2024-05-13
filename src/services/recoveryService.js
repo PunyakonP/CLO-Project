@@ -12,7 +12,14 @@ const http = axios.create({
 
 async function recoveryBooking() {
   const countRecovery = await countGetFile();
-
+  const result = {
+    message: "",
+    notFound: [],
+    response: {
+        success: [],
+        failed: []
+    }
+  }
   Logger.info(`Date diff is : ${countRecovery}`);
 
   for (i = 0; i < countRecovery; i++) {
@@ -48,8 +55,8 @@ async function recoveryBooking() {
       )}`;
       await saveTransferRecord(bookingFindName, lastTransfer, value);
       Logger.info(`Create a new history: ${bookingFindName} with emtry data`);
-
-      return true;
+    //   result.notFound.push(value)
+      return false;
     }
 
     let success = 0;
@@ -68,6 +75,7 @@ async function recoveryBooking() {
       if (response.status == 200) {
         success++;
         //to do make logging
+        result.response.success.push(mappedBookings[j])
         Logger.info(
           `Send request ${mappedBookings[j].event_name} lead(${
             mappedBookings[j].user_data.lead_id
@@ -75,6 +83,7 @@ async function recoveryBooking() {
         );
       } else {
         failed++;
+        result.response.failed.push(mappedBookings[j])
         Logger.error(
           `⚠ Failed to request data: ${JSON.stringify(
             mappedBookings[j]
@@ -100,11 +109,13 @@ async function recoveryBooking() {
     }
 
     const messageLog = `All request quelified Lead is success => ${success}, is failed => ${failed}`;
+    result.message = messageLog
     Logger.debug(messageLog);
 
     await saveTransferRecord(bookingFindName, lastTransfer, messageLog);
   }
-  return;
+
+  return result;
 }
 
 function findMatchingBooking(dataList, checkDate) {

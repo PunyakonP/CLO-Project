@@ -25,7 +25,7 @@ exports.getBookingLead = async (req, res, next) => {
   try {
     const request = await runValidation({}, joi.object());
     const result = await c365Service("booking");
-
+    console.log();
     Logger.info(`Successfully get API identity: ${result}`, {
       result,
       request,

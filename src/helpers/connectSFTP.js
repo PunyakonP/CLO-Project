@@ -35,9 +35,7 @@ class SFTP {
       return this.client;
     } catch (err) {
       setLogLevel("error");
-      Logger.error(
-        `Set up SFTP Error: '${err}'`
-      );
+      Logger.error(`Set up SFTP Error: '${err}'`);
       // if (error == "Error: lstat: lstat: No SFTP connection available") {
       //   this.setup();
       // }
@@ -76,6 +74,46 @@ class SFTP {
       return result;
     } catch (error) {
       console.log(error);
+    }
+  }
+
+  async where() {
+    try {
+      const pathNow = await this.client.cwd();
+      console.log(pathNow);
+      if (!pathNow) {
+        Logger.warning(`Can not get path`);
+      }
+      return pathNow;
+    } catch (error) {
+      Logger.error(error);
+    }
+  }
+
+  async realPath() {
+    const rPath = await this.client.realPath();
+    if(!rPath){
+      Logger.debug(`Path not found`)
+    }
+    return rPath;
+  }
+
+  async streamR(){
+    const dd = await this.client.createReadStream()
+    return dd
+  } 
+
+  async streamC() {
+    const aa = await this.client.createWriteStream()
+    return aa
+  }
+    
+
+  async stats() {
+    const point = await this.client.stat()
+    if(!point){
+      Logger.debug(`Can not acsociate point`)
+      return point
     }
   }
 
