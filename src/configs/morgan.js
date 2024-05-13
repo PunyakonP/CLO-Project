@@ -1,7 +1,7 @@
 const morgan = require('morgan');
 const Logger = require('../helpers/Logger');
 
-const morganMessageFormatter = morgan.compile(':remote-addr - :remote-user | :method :url ▶ :status 💻 :user-agent (⌚ :response-time ms)');
+const morganMessageFormatter = morgan.compile(':remote-addr - :remote-user | :method :url ▶ :status 💻  :user-agent (⌚ :response-time ms)');
 // (':remote-addr - :remote-user [:date[clf]] ":method :url HTTP/:http-version" :status :res[content-length] ":user-agent"')
 
 const morganFormatter = (tokens, req, res) => {
