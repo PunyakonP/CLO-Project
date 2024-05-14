@@ -38,8 +38,8 @@ exports.webHookFacebook = async (req, res, next) => {
 
     // HTTP Request
     await axios.post(`${process.env.TCAP_API_URL}/api/transfers/initial`, {
-      createdTime: created_time,
-      leadgenId: id,
+      "createdTime": created_time,
+      "leadgenId": id,
     });
 
     Logger.info("Successfully request HTTP API TCAP", {
