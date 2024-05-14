@@ -16,8 +16,8 @@ async function recoveryBooking() {
     message: "",
     notFound: [],
     response: {
-        success: [],
-        failed: []
+      success: [],
+      failed: []
     }
   }
   Logger.info(`Date diff is : ${countRecovery}`);
@@ -55,8 +55,8 @@ async function recoveryBooking() {
       )}`;
       await saveTransferRecord(bookingFindName, lastTransfer, value);
       Logger.info(`Create a new history: ${bookingFindName} with emtry data`);
-    //   result.notFound.push(value)
-      return false;
+      result.notFound.push(value)
+      return result;
     }
 
     let success = 0;
@@ -77,8 +77,7 @@ async function recoveryBooking() {
         //to do make logging
         result.response.success.push(mappedBookings[j])
         Logger.info(
-          `Send request ${mappedBookings[j].event_name} lead(${
-            mappedBookings[j].user_data.lead_id
+          `Send request ${mappedBookings[j].event_name} lead(${mappedBookings[j].user_data.lead_id
           }) at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)} `
         );
       } else {
@@ -383,8 +382,7 @@ async function recoveryDelivery() {
         success++;
         //to do make logging
         Logger.info(
-          `Send request ${mappedDelivery[i].event_name} lead(${
-            mappedDelivery[i].user_data.lead_id
+          `Send request ${mappedDelivery[i].event_name} lead(${mappedDelivery[i].user_data.lead_id
           }) at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)} `
         );
       } else {

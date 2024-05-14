@@ -38,7 +38,7 @@ class CacheData {
       Logger.info(`Connect REDIS: ${this.client.isOpen}`);
       return this.client;
     } catch (error) {
-      await reconnect();
+      // await reconnect();
       //   setLogLevel("error");
       //   AzureLogger.log = (...error) => {
       // };

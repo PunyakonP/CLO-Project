@@ -17,17 +17,19 @@ const http = axios.create({
  * @returns
  */
 async function readFile(eventName) {
-  Logger.debug(`Start connecting SFTP`);
+  Logger.debug(`Start connecting SFTP`)
   await SFTP.connect();
-  Logger.debug(`Connected SFTP successful`);
-  const pathDir = process.env.SFTP_PATH;
+  Logger.debug(`Connected SFTP successful`)
+  const pathDir = process.env.SFTP_PATH
 
+  const pathNow = await SFTP.where();
+  Logger.debug(`Now this path are you login: ${pathNow}`)
 
-  const checkFolderPath = await SFTP.exist(pathDir);
-  if (!checkFolderPath) {
-    Logger.warning(`Directory is not exist ${pathDir}, ${checkFolderPath}`);
-    return false;
-  }
+  // const checkFolderPath = await SFTP.exist('/c365/dev/current/facebook/system/trans_clo_booking_lead');
+  // if (!checkFolderPath) {
+  //   Logger.warning(`Directory is not exist ${pathDir}, ${checkFolderPath}`);
+  //   return false;
+  // }
 
   if (eventName !== "booking") {
     const delivery = await deliveryLead();
