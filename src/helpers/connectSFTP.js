@@ -1,15 +1,29 @@
 const Client = require("ssh2-sftp-client");
 const connSFTP = require('../configs/sftp');
+const { setLogLevel, AzureLogger } = require('@azure/logger');
+const Logger = require("./Logger");
 
+
+/**
+ * SFTP client
+ */
 class SFTP {
+    /**
+     * Constructor
+     * @param {} options // 
+     */
     constructor(options) {
         this.options = options;
         this.setup();
     }
 
+    /**
+     * initial connect
+     */
     async setup() {
-        const sftp = new Client();
-        this.client = await sftp.connect(this.options);
+        this.client = new Client();
+        await this.client.connect(this.options);
+        await this.connect();
     }
 
     async connect() {
@@ -20,34 +34,52 @@ class SFTP {
             return this.client;
         }
         catch (err) {
-            // to do: make logging
-            console.log(err);
+            setLogLevel('error');
+            AzureLogger.log = (...error) => {
+                console.log(error);
+            };
         }
+    }
+
+    async getlsit(path) {
+        return await this.client.list(path)
+    }
+
+    async current() {
+        return await this.client.cwd()
     }
 
     async exist(path) {
         // todo waiting path from tdem
-        const checkFolderExist = await this.client.exists(path)
-
-        if (!checkFolderExist) {
-            console.log('Folder is not exist.');
-            return false;
-        }
-
-        return true;
+        const checkFolderExist = await this.client.exists('/clo_sftp/trans_data_clo')
+       
+        return checkFolderExist;
     }
-
-    async readFile(fileName) {
+    /**
+     * 
+     * @param {string} fileName 
+     * @returns {Promise}
+     */
+    async get(fileName) {
         try {
-            const fileRemote = await this.client.get(fileName);
+            const result = await this.client.get(fileName);
 
-            if (!fileRemote) {
+            if (!result) {
                 return null;
             }
 
-            return fileName;
+            return result;
         } catch (error) {
             console.log(error);
+        }
+    }
+
+    async close() {
+        try {
+            const disconnect = await this.client.end();
+            console.log(disconnect);
+        } catch (error) {
+            Logger.error(`Failed to close sesion SFTP: ${error}`)
         }
     }
 }

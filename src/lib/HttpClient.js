@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const axios_1 = require("axios");
 const CustomError_1 = require("./errors/CustomError");
+const { ExceptionHandler } = require("winston");
 /**
  * HttpClient
  */
@@ -56,18 +57,17 @@ class HttpClient {
      */
     onResponse(response) {
         const data = response.data;
-        const { status, result } = data;
-        if (status === 'ERROR') {
-            throw CustomError_1.default.fromJSON(result);
-        }
-        return result;
+        // const { status, result } = data;
+        // throw CustomError_1.default.fromJSON(result);
+        return data;
     }
     /**
     * Handle Error response
     * @return {void}
     */
-    onErrorResponse() {
-        throw new Error('The requested API returned an unknown error. Please contact developer for more info.');
+    onErrorResponse(response) {
+        throw new Error(`The requested API returned an unknown error. Please contact developer for more info. : ${response}`);
+        // throw new ExceptionHandler
     }
     /**
      * Initialize the http instance of axios
