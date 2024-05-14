@@ -25,11 +25,16 @@ async function readFile(eventName) {
   const pathNow = await SFTP.where();
   Logger.debug(`Now this path are you login: ${pathNow}`)
 
-  // const checkFolderPath = await SFTP.exist('/c365/dev/current/facebook/system/trans_clo_booking_lead');
-  // if (!checkFolderPath) {
-  //   Logger.warning(`Directory is not exist ${pathDir}, ${checkFolderPath}`);
-  //   return false;
-  // }
+  const listFolder = await SFTP.getlsit(`/c365/dev/current/facebook/system`);
+  if (!listFolder) {
+    Logger.warning(`Directory is not exist ${pathDir}, ${listFolder}`);
+    return false;
+  }
+  Logger.info(`list file ${JSON.stringify(listFolder)}`)
+
+  // const getFile = await SFTP.get('/c365/dev/current/facebook/system/trans_clo_booking_lead/test1.txt')
+  // Logger.info(`file name ${getFile}`)
+
 
   if (eventName !== "booking") {
     const delivery = await deliveryLead();
@@ -43,6 +48,8 @@ async function readFile(eventName) {
   Logger.info(`Close connection SFTP`)
   return booking
 }
+
+
 
 async function findAllBooking () {
   const path = `${process.env.SFTP_PATH}/trans_clo_booking_lead/`
@@ -249,7 +256,7 @@ async function historyTransfer(data) {
 // delivery lead
 
 async function findAllDelivery () {
-  const path = `${process.env.SFTP_PATH}/trans_clo_delivered_lead/`
+  const path = `${process.env.SFTP_PATH}/trans_clo_delivered_lead`
   const dataListBooking =  await SFTP.getlsit(path);
   Logger.info(`list data: ${dataListBooking.length} items`)
   return dataListBooking;
