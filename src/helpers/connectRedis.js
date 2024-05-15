@@ -32,28 +32,11 @@ class CacheData {
 
       if (pong !== "PONG") {
         Logger.debug(pong);
+        return pong;
       }
       Logger.info(`Connect REDIS: ${this.client.isOpen}`);
-
-      this.client.on('connect', function () {
-        console.log('Connected to Redis');
-      });
-  
-      this.client.on('error', function (error) {
-        console.error('Redis error:', error);
-      });
-
-      this.client.on('end', function () {
-        console.log('Connection to Redis ended unexpectedly');
-        // Attempt automatic reconnection after a delay
-        setTimeout(connectToRedis, 3000); // Retry connection after 5 seconds
-      });
-
       return this.client;
     } catch (error) {
-      //   setLogLevel("error");
-      //   AzureLogger.log = (...error) => {
-      // };
       Logger.error(error);
     }
   }
@@ -78,8 +61,10 @@ class CacheData {
         result.field,
         result.value
       );
-      if (+response) {
+
+      if (response <= 0) {
         Logger.warning("Failed to insert data");
+        return null;
       }
 
       return response;
@@ -87,8 +72,6 @@ class CacheData {
       Logger.error(error);
     }
   }
-
-
   /**
    *
    * @param {*} data
@@ -156,7 +139,8 @@ class CacheData {
 
     try {
       const response = await this.client.hDel(result.key, result.field);
-      if (response !== "0") {
+
+      if (response <= 0) {
         Logger.warning(`Can not clean data: ${result.field}`);
         return response;
       }

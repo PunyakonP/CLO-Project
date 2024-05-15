@@ -25,7 +25,21 @@ exports.getBookingLead = async (req, res, next) => {
   try {
     const request = await runValidation({}, joi.object());
     const result = await c365Service("booking");
-    console.log();
+    Logger.info(`Successfully get API identity: ${result}`, {
+      result,
+      request,
+    });
+    success(res, { status: "SUCCESS", result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getDeliveryLead = async (req, res, next) => {
+  try {
+    const request = await runValidation({}, joi.object());
+    const result = await c365Service("delivery");
+
     Logger.info(`Successfully get API identity: ${result}`, {
       result,
       request,
@@ -39,7 +53,6 @@ exports.getBookingLead = async (req, res, next) => {
 exports.getInitialLead = async (req, res, next) => {
   try {
     const { createdTime, leadgenId } = req.body;
-    console.log(createdTime, leadgenId);
     const request = await runValidation(
       { createdTime, leadgenId },
       joi.object({
@@ -59,17 +72,4 @@ exports.getInitialLead = async (req, res, next) => {
   }
 };
 
-exports.getDeliveryLead = async (req, res, next) => {
-  try {
-    const request = await runValidation({}, joi.object());
-    const result = c365Service("delivery");
 
-    Logger.info(`Successfully get API identity: ${result}`, {
-      result,
-      request,
-    });
-    success(res, { status: "SUCCESS", result });
-  } catch (error) {
-    next(error);
-  }
-};

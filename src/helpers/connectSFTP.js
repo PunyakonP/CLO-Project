@@ -1,5 +1,6 @@
 const Client = require("ssh2-sftp-client");
 const connSFTP = require("../configs/sftp");
+const path = require('path')
 const { setLogLevel, AzureLogger } = require("@azure/logger");
 const Logger = require("./Logger");
 /**
@@ -12,7 +13,6 @@ class SFTP {
    */
   constructor(options) {
     this.options = options;
-    this.setup();
   }
 
   /**
@@ -22,7 +22,7 @@ class SFTP {
     this.client = new Client();
     await this.client.connect(this.options);
     Logger.debug(
-      `✅ Set up to SFTP '${this.options.host}' at: ${this.options.port}`
+      `✅ Successfully Connected to SFTP '${this.options.host}' at: ${this.options.port}`
     );
   }
 
@@ -33,11 +33,9 @@ class SFTP {
       }
       return this.client;
     } catch (err) {
-      setLogLevel("error");
+      // setLogLevel("error");
       Logger.error(`Set up SFTP Error: '${err}'`);
-      if (err == "Error: lstat: lstat: No SFTP connection available") {
-        this.setup();
-      }
+    
     }
   }
 
@@ -55,10 +53,10 @@ class SFTP {
     return checkFolderExist;
   }
 
-  async dowmloadFile(remotePath) {
+  async dowmloadFile(remotePath,fileName) {
     
     try {
-      const fileDownload = await this.client.fastGet(remotePath, '../assets')
+      const fileDownload = await this.client.fastGet(remotePath, path.join(__dirname, '..', `/assets/${fileName}`))
       return fileDownload
     } catch (error) {
       Logger.error(error.message)
@@ -80,14 +78,13 @@ class SFTP {
 
       return result;
     } catch (error) {
-      console.log(error);
+      Logger.error(error);
     }
   }
 
   async where() {
     try {
       const pathNow = await this.client.cwd();
-      console.log(pathNow);
       if (!pathNow) {
         Logger.warning(`Can not get path`);
       }

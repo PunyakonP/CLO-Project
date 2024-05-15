@@ -3,6 +3,7 @@ const httpStatus = require("http-status");
 const Logger = require("../helpers/Logger");
 const axios = require("axios");
 const soap = require("soap");
+const serviceLeadConversion = require('../services/leadConversionServies')
 
 exports.verifyRequestSignature = async (req, res) => {
   const mode = req.query["hub.mode"];
@@ -37,7 +38,12 @@ exports.webHookFacebook = async (req, res, next) => {
     const { created_time, id } = result.data;
 
     // HTTP Request
-    await axios.post(`${process.env.TCAP_API_URL}/api/transfers/initial`, {
+    // await axios.post(`${process.env.TCAP_API_URL}/api/transfers/initial`, {
+    //   "createdTime": created_time,
+    //   "leadgenId": id,
+    // });
+
+    await serviceLeadConversion.getInitialLead({
       "createdTime": created_time,
       "leadgenId": id,
     });

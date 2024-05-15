@@ -64,3 +64,5 @@ dist
 dist/**/*.js
 dist/**/*.js.map
 build
+
+test*.js

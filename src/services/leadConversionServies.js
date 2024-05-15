@@ -26,8 +26,7 @@ async function getQuerifiedLead() {
 
   if (!result || result.recordset.length <= 0) {
     Logger.debug(
-      `This date: ${new Date().toLocaleDateString()} don't have data. Result: ${
-        result.recordset.length
+      `This date: ${new Date().toLocaleDateString()} don't have data. Result: ${result.recordset.length
       }`
     );
     return;
@@ -36,7 +35,7 @@ async function getQuerifiedLead() {
   Logger.info(`QuerifiedLead count: ${result.recordset.length}`);
 
   const mapQuelifiedLead = await mapDataForMeta("qualified", result.recordset);
- 
+
   let success = 0;
   let failed = 0;
   for (i = 0; i < mapQuelifiedLead.length; i++) {
@@ -51,38 +50,29 @@ async function getQuerifiedLead() {
     if (response.status == 200) {
       success++;
       //to do make logging
-      Logger.info(
-        `Send request ${mapQuelifiedLead[i].event_name} lead(${
-          mapQuelifiedLead[i].user_data.lead_id
-        }) at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)} `
-      );
-    } else {
+      Logger.info(`Send request ${mapQuelifiedLead[i].event_name} lead(${mapQuelifiedLead[i].user_data.lead_id}) at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)}`);
+    } 
+    else {
       failed++;
-      Logger.error(
-        `⚠ Failed to request data: ${JSON.stringify(
-          mapQuelifiedLead[i]
-        )} \nException : ${JSON.stringify(response.response.data)}`
-      );
-      // to do make cashe Redis
-      // for (i = failed; i < mapQuelifiedLead.length; i++) {
-
-      //     const checkDuplicate = CacheData.getData(mapQuelifiedLead[i].user_data.lead_id)
-      //     if (checkDuplicate) {
-      //         Logger.warning(`This leadi_id: ${mapQuelifiedLead[i].user_data.lead_id} is exist in cached`);
-      //     } else {
-      //         const recoveryData = { key: `${mapQuelifiedLead[i].user_data.lead_id}`, value: JSON.stringify(mapQuelifiedLead[i]) }
-      //         await CacheData.setData(recoveryData);
-      //     }
-      // }
-      // Logger.info(
-      //   `Saved cache successfully at ${moment().format(
-      //     `YYYY-MM-DD HH:mm:ss.SSS`
-      //   )} `
-      // );
+      Logger.error(`⚠ Failed to request data: ${JSON.stringify(mapQuelifiedLead[i])} \nException : ${JSON.stringify(response.response.data)}`);
     }
-    Logger.debug(
-      `All request quelified Lead is success${success}, is failed${failed}`
-    );
+    const message = `All request quelified Lead is success${success}, is failed${failed}`
+    Logger.debug(message);
+
+    const checkDuplicate = await CacheData.getData("Lead_Quelified", `${leadId}`);
+    if (checkDuplicate) {
+      Logger.warning(`This leadi_id: ${leadId} is exist in cached`);
+    } 
+    else {
+
+      const recoveryData = await CacheData.setData("Lead_Quelified", `${leadId}`, JSON.stringify(mapRawLead.data[0]));
+
+      if (!recoveryData) {
+        Logger.error(`Failed to insert Cashe data for: ${leadId}`)
+      }
+    }
+
+    Logger.info(`Created raw lead: ${leadId} to save cache successfully at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)}`);
   }
 }
 
@@ -102,10 +92,10 @@ async function getInitialLead(data) {
     data: [
       {
         event_name: "qualified",
-        event_time: 1629424350,
+        event_time: createdTime,
         action_source: "system_generated",
         user_data: {
-          lead_id: 525645896321548,
+          lead_id: leadgenId,
         },
         custom_data: {
           event_source: "crm",
@@ -114,8 +104,9 @@ async function getInitialLead(data) {
       },
     ],
   };
-  console.log('==========',JSON.stringify(mapRawLead));
-     
+
+  Logger.info('Map data from webhook', JSON.stringify(mapRawLead));
+
   const queryParams = `?access_token=${process.env.ACCESS_TOKEN_FACEBOOK}`;
 
   const response = await http
@@ -126,35 +117,27 @@ async function getInitialLead(data) {
 
   if (response.status == 200) {
     Logger.info(
-      `Send request ${mapRawLead.data[0].event_name} lead(${
-        mapRawLead.data[0].user_data.lead_id}) at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)} `
-    );
-  } else {
-    Logger.error(
-      `⚠ Failed to request data: ${JSON.stringify(mapRawLead.data[0])} \nException : ${JSON.stringify(response.response.data)}`
-    );
+      `Send request ${mapRawLead.data[0].event_name} lead(${mapRawLead.data[0].user_data.lead_id}) at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)}`);
+  } 
+  else {
+    Logger.error(`⚠ Failed to request data: ${JSON.stringify(mapRawLead.data[0])} \nException : ${JSON.stringify(response.response.data)}`);
     //to do make cashe Redis
     const leadId = mapRawLead.data[0].user_data.lead_id;
-    console.log(leadId);
+      Logger.info(`Initial lead data: ${leadId}`);
     const checkDuplicate = await CacheData.getData("Lead_Initial", `${leadId}`);
     if (checkDuplicate) {
-      Logger.warning(
-        `This leadi_id: ${leadId} is exist in cached`
-      );
-    } else {
+      Logger.warning(`This leadi_id: ${leadId} is exist in cached`);
+    } 
+    else {
+
       const recoveryData = await CacheData.setData("Lead_Initial", `${leadId}`, JSON.stringify(mapRawLead.data[0]));
 
-      if(!recoveryData){
+      if (!recoveryData) {
         Logger.error(`Failed to insert Cashe data for: ${leadId}`)
-    const dataListBooking = await findAllBooking()
-  }
+      }
     }
 
-    Logger.info(
-      `Created raw lead: ${leadId} to save cache successfully at ${moment().format(
-        `YYYY-MM-DD HH:mm:ss.SSS`
-      )} `
-    );
+    Logger.info(`Created raw lead: ${leadId} to save cache successfully at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)}`);
   }
 }
 
