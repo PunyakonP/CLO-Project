@@ -32,21 +32,22 @@ class CacheData {
 
       if (pong !== "PONG") {
         Logger.debug(pong);
-        await reconnect();
+        await this.reconnect();
         return pong;
       }
       Logger.info(`Connect REDIS: ${this.client.isOpen}`);
       return this.client;
     } catch (error) {
-      // await reconnect();
       //   setLogLevel("error");
       //   AzureLogger.log = (...error) => {
       // };
       Logger.error(error);
+      await this.reconnect()
     }
   }
 
   async reconnect() {
+    this.client.on()
     redis.createClient({
       socket: {
         reconnectStrategy: (retries) => Math.min(retries * 50, 1000),
@@ -82,6 +83,8 @@ class CacheData {
       Logger.error(error);
     }
   }
+
+
   /**
    *
    * @param {*} data

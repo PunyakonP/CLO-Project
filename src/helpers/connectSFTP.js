@@ -2,7 +2,6 @@ const Client = require("ssh2-sftp-client");
 const connSFTP = require("../configs/sftp");
 const { setLogLevel, AzureLogger } = require("@azure/logger");
 const Logger = require("./Logger");
-
 /**
  * SFTP client
  */
@@ -36,9 +35,9 @@ class SFTP {
     } catch (err) {
       setLogLevel("error");
       Logger.error(`Set up SFTP Error: '${err}'`);
-      // if (error == "Error: lstat: lstat: No SFTP connection available") {
-      //   this.setup();
-      // }
+      if (err == "Error: lstat: lstat: No SFTP connection available") {
+        this.setup();
+      }
     }
   }
 
@@ -52,12 +51,20 @@ class SFTP {
 
   async exist(path) {
     // todo waiting path from tdem
-    const checkFolderExist = await this.client.exists(
-      "/clo_sftp/trans_data_clo"
-    );
-
+    const checkFolderExist = await this.client.exists(path);
     return checkFolderExist;
   }
+
+  async dowmloadFile(remotePath) {
+    
+    try {
+      const fileDownload = await this.client.fastGet(remotePath, '../assets')
+      return fileDownload
+    } catch (error) {
+      Logger.error(error.message)
+    }
+  }
+
   /**
    *
    * @param {string} fileName
@@ -90,14 +97,6 @@ class SFTP {
     }
   }
 
-  async realPath() {
-    const rPath = await this.client.realPath();
-    if(!rPath){
-      Logger.debug(`Path not found`)
-    }
-    return rPath;
-  }
-
   async streamR(){
     const dd = await this.client.createReadStream()
     return dd
@@ -119,10 +118,13 @@ class SFTP {
 
   async close() {
     try {
-      const disconnect = await this.client.end();
+      const disconnect = await this.client.end()
       Logger.info(disconnect);
+      return disconnect;
+      
     } catch (error) {
       Logger.error(`Failed to close sesion SFTP: ${error}`);
+      return err
     }
   }
 }

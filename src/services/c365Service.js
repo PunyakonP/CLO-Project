@@ -25,12 +25,12 @@ async function readFile(eventName) {
   const pathNow = await SFTP.where();
   Logger.debug(`Now this path are you login: ${pathNow}`)
 
-  const listFolder = await SFTP.getlsit(`/c365/dev/current/facebook/system`);
+  const listFolder = await SFTP.getlsit(`/clo_sftp/c365/dev/current/facebook/system`);
   if (!listFolder) {
     Logger.warning(`Directory is not exist ${pathDir}, ${listFolder}`);
     return false;
   }
-  Logger.info(`list file ${JSON.stringify(listFolder)}`)
+  Logger.info(`list foldefs ${JSON.stringify(listFolder)}`)
 
   // const getFile = await SFTP.get('/c365/dev/current/facebook/system/trans_clo_booking_lead/test1.txt')
   // Logger.info(`file name ${getFile}`)
@@ -38,13 +38,13 @@ async function readFile(eventName) {
 
   if (eventName !== "booking") {
     const delivery = await deliveryLead();
-    await SFTP.close();
+    // await SFTP.close();
     Logger.info(`Close connection SFTP`)
     return delivery;
   }
 
   const booking = await bookingLead();
-  await SFTP.close();
+  // await SFTP.close();
   Logger.info(`Close connection SFTP`)
   return booking
 }
@@ -161,7 +161,7 @@ async function saveTransferRecord(fildName, lastTransfer, value){
 async function bookingLead() {
   try {
     const dataListBooking = await findAllBooking()
-    const currentDete = getDateFromNow("2024-05-08T12:38:56.207Z", 1)
+    const currentDete = getDateFromNow("2024-05-07T12:38:56.207Z", 1)
     const lastTransfer = await historyTransfer({
       key: "C365_HistoryBooking",
       field: "",
@@ -202,7 +202,7 @@ async function bookingLead() {
     }
   
     const result = await processBookingRequests(mappedBookings)
-    await saveTransferRecord(bookingFindName, lastTransfer, valueMessage)
+    await saveTransferRecord(bookingFindName, lastTransfer, value)
     Logger.info(result.message)
     return result
   
@@ -336,7 +336,7 @@ async function saveTransferDelivery(fildName, lastTransfer, value){
 async function deliveryLead() {
   try {
     const dataListDelivery = await findAllDelivery()
-    const currentDete = getDateFromNow("2024-05-07T12:38:56.207Z", 1)
+    const currentDete = getDateFromNow(moment(), 1)
     const lastTransfer = await historyTransfer({
       key: "C365_HistoryDelivery",
       field: "",
