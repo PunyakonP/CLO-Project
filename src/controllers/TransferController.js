@@ -60,7 +60,7 @@ exports.getInitialLead = async (req, res, next) => {
         leadgenId: joi.string().required(),
       })
     );
-    const result = leadConversionServies.getInitialLead(request);
+    const result = await leadConversionServies.getInitialLead(request);
 
     Logger.info(`Successfully get API identity: ${result}`, {
       result,

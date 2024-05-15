@@ -36,7 +36,7 @@ class MssqlConnection {
       params.forEach(param => {
         if (param.type && param.name) preparedStatement.input(param.name, param.type);
       });
-
+      Logger.info(`Query string: ${queryString}`)
       await preparedStatement.prepare(queryString);
 
       const values = params.reduce((acc, { name, value }) => {
