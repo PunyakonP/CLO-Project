@@ -32,27 +32,15 @@ class CacheData {
 
       if (pong !== "PONG") {
         Logger.debug(pong);
-        await reconnect();
         return pong;
       }
       Logger.info(`Connect REDIS: ${this.client.isOpen}`);
       return this.client;
     } catch (error) {
-      // await reconnect();
-      //   setLogLevel("error");
-      //   AzureLogger.log = (...error) => {
-      // };
       Logger.error(error);
     }
   }
 
-  async reconnect() {
-    redis.createClient({
-      socket: {
-        reconnectStrategy: (retries) => Math.min(retries * 50, 1000),
-      },
-    });
-  }
   /**
    * set data to redis from recovery
    * @param {*} data
@@ -73,8 +61,10 @@ class CacheData {
         result.field,
         result.value
       );
-      if (+response) {
+
+      if (response <= 0) {
         Logger.warning("Failed to insert data");
+        return null;
       }
 
       return response;
@@ -149,7 +139,8 @@ class CacheData {
 
     try {
       const response = await this.client.hDel(result.key, result.field);
-      if (response !== "0") {
+
+      if (response <= 0) {
         Logger.warning(`Can not clean data: ${result.field}`);
         return response;
       }

@@ -23,7 +23,6 @@ async function recoveryBooking() {
   Logger.info(`Date diff is : ${countRecovery}`);
 
   for (i = 0; i < countRecovery; i++) {
-    console.log("=========", [i]), countRecovery;
 
     const dataListBooking = await findAllBooking();
     const dateSub = await getDateSubtract();
@@ -310,7 +309,6 @@ function getCurrentTimestamp(dateTime) {
 
 function findMatchingDelivery(dataList, checkDate) {
   const regex = /_(\d{8})\.txt$/;
-  console.log(dataList, checkDate);
   for (const delivery of dataList) {
     const match = delivery.name.match(regex);
     if (match && match[1] == checkDate) {
@@ -329,8 +327,6 @@ async function recoveryDelivery() {
   Logger.info(`Date diff is : ${countRecovery}`);
 
   for (i = 0; i < countRecovery; i++) {
-    console.log("=========", [i]);
-
     const dataListBooking = await findAllDelivery();
     const dateSub = await getDateSubtract();
     const lastTransfer = await historyTransfer({
