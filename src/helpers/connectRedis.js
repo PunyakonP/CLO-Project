@@ -32,28 +32,32 @@ class CacheData {
 
       if (pong !== "PONG") {
         Logger.debug(pong);
-        await this.reconnect();
-        return pong;
       }
       Logger.info(`Connect REDIS: ${this.client.isOpen}`);
+
+      this.client.on('connect', function () {
+        console.log('Connected to Redis');
+      });
+  
+      this.client.on('error', function (error) {
+        console.error('Redis error:', error);
+      });
+
+      this.client.on('end', function () {
+        console.log('Connection to Redis ended unexpectedly');
+        // Attempt automatic reconnection after a delay
+        setTimeout(connectToRedis, 3000); // Retry connection after 5 seconds
+      });
+
       return this.client;
     } catch (error) {
       //   setLogLevel("error");
       //   AzureLogger.log = (...error) => {
       // };
       Logger.error(error);
-      await this.reconnect()
     }
   }
 
-  async reconnect() {
-    this.client.on()
-    redis.createClient({
-      socket: {
-        reconnectStrategy: (retries) => Math.min(retries * 50, 1000),
-      },
-    });
-  }
   /**
    * set data to redis from recovery
    * @param {*} data
