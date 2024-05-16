@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const rootController = require('../controllers/RootController');
 
-router.get('/', (req, res) => {
-    res.send('TCAP Api to meta. ')
-});
+router.get('/', rootController.getApiIdentity);
+router.get('/testip', rootController.getApiIdentity);
 
 module.exports = router;

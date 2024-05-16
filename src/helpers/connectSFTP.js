@@ -1,55 +1,129 @@
 const Client = require("ssh2-sftp-client");
-const connSFTP = require('../configs/sftpConnect');
-
+const connSFTP = require("../configs/sftp");
+const path = require('path')
+const { setLogLevel, AzureLogger } = require("@azure/logger");
+const Logger = require("./Logger");
+/**
+ * SFTP client
+ */
 class SFTP {
-    constructor(options) {
-        this.options = options;
+  /**
+   * Constructor
+   * @param {} options //
+   */
+  constructor(options) {
+    this.options = options;
+  }
+
+  /**
+   * initial connect
+   */
+  async setup() {
+    this.client = new Client();
+    await this.client.connect(this.options);
+    Logger.debug(
+      `✅ Successfully Connected to SFTP '${this.options.host}' at: ${this.options.port}`
+    );
+  }
+
+  async connect() {
+    try {
+      if (!this.client) {
         this.setup();
+      }
+      return this.client;
+    } catch (err) {
+      // setLogLevel("error");
+      Logger.error(`Set up SFTP Error: '${err}'`);
+    
     }
+  }
 
-    async setup() {
-        const sftp = new Client();
-        this.client = await sftp.connect(this.options);
+  async getlsit(path) {
+    return await this.client.list(path);
+  }
+
+  async current() {
+    return await this.client.cwd();
+  }
+
+  async exist(path) {
+    // todo waiting path from tdem
+    const checkFolderExist = await this.client.exists(path);
+    return checkFolderExist;
+  }
+
+  async dowmloadFile(remotePath,fileName) {
+    
+    try {
+      const fileDownload = await this.client.fastGet(remotePath, path.join(__dirname, '..', `/assets/${fileName}`))
+      return fileDownload
+    } catch (error) {
+      Logger.error(error.message)
     }
+  }
 
-    async connect() {
-        try {
-            if (!this.client) {
-                this.setup();
-            }
-            return this.client;
-        }
-        catch (err) {
-            // to do: make logging
-            console.log(err);
-        }
+  /**
+   *
+   * @param {string} fileName
+   * @returns {Promise}
+   */
+  async get(fileName) {
+    try {
+      const result = await this.client.get(fileName);
+
+      if (!result) {
+        return null;
+      }
+
+      return result;
+    } catch (error) {
+      Logger.error(error);
     }
+  }
 
-    async exist(path) {
-        // todo waiting path from tdem
-        const checkFolderExist = await this.client.exists(path)
-
-        if (!checkFolderExist) {
-            console.log('Folder is not exist.');
-            return false;
-        }
-
-        return true;
+  async where() {
+    try {
+      const pathNow = await this.client.cwd();
+      if (!pathNow) {
+        Logger.warning(`Can not get path`);
+      }
+      return pathNow;
+    } catch (error) {
+      Logger.error(error);
     }
+  }
 
-    async readFile(fileName) {
-        try {
-            const fileRemote = await this.client.get(fileName);
+  async streamR(){
+    const dd = await this.client.createReadStream()
+    return dd
+  } 
 
-            if (!fileRemote) {
-                return null;
-            }
+  async streamC() {
+    const aa = await this.client.createWriteStream()
+    return aa
+  }
+    
 
-            return fileName;
-        } catch (error) {
-            console.log(error);
-        }
+  async stats() {
+    const point = await this.client.stat()
+    if(!point){
+      Logger.debug(`Can not acsociate point`)
+      return point
     }
+  }
+
+  async close() {
+    try {
+      const disconnect = await this.client.end()
+      Logger.info(disconnect);
+      return disconnect;
+      
+    } catch (error) {
+      Logger.error(`Failed to close sesion SFTP: ${error}`);
+      return err
+    }
+  }
 }
 
-module.exports = new SFTP(connSFTP)
+module.exports = new SFTP(connSFTP);
