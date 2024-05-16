@@ -4,6 +4,7 @@ const configRedis = {
     'socket': {
         reconnectStrategy: (retries) => Math.min(retries * 50, 1000),
     },
+    'pingInterval': 10000,
 }
 
 module.exports = configRedis

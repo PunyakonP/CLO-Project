@@ -2,6 +2,7 @@ const fs = require("fs");
 const { parse } = require("csv-parse/sync");
 const Logger = require("../helpers/Logger");
 const moment = require("moment");
+moment.defaultFormat = moment.ISO_8601
 const SFTP = require("../helpers/connectSFTP");
 const CacheData = require("../helpers/connectRedis");
 const axios = require("axios");
@@ -25,7 +26,7 @@ async function readFile(eventName) {
   const pathNow = await SFTP.where();
   Logger.debug(`Now this path are you login: ${pathNow}`)
 
-  const listFolder = await SFTP.getlsit(`/clo_sftp/c365/dev/current/facebook/system`);
+  const listFolder = await SFTP.getlsit(pathDir);
   if (!listFolder) {
     Logger.warning(`Directory is not exist ${pathDir}, ${listFolder}`);
     return false;
@@ -34,7 +35,7 @@ async function readFile(eventName) {
 
   if (eventName !== "booking") {
     const delivery = await deliveryLead();
-    
+
     await SFTP.close();
     Logger.info(`Close connection SFTP`)
     return delivery;
@@ -54,7 +55,7 @@ async function readFile(eventName) {
 async function bookingLead() {
   try {
     const dataListBooking = await findAllBooking()
-    const currentDete = getDateFromNow("", 1)
+    const currentDete = getDateFromNow(`${process.env.DATETIME_LEAD}`, 1)
     const lastTransfer = await historyTransfer({
       key: "C365_HistoryBooking",
       field: "",
@@ -177,6 +178,7 @@ async function processBookingRequests(mappedBookings) {
       success: [],
       failed: []
     }
+    
   }
   const queryParams = `?access_token=${process.env.ACCESS_TOKEN_FACEBOOK}`;
   let success = 0;
@@ -190,8 +192,8 @@ async function processBookingRequests(mappedBookings) {
       Logger.info(`Send request ${booking.event_name} lead(${booking.user_data.lead_id}) at ${getCurrentTimestamp()}`);
     } else {
       failed++;
-      result.response.failed.push(booking);
-      Logger.error(`Failed to request data: ${JSON.stringify(booking)} \nException : ${JSON.stringify(response.response.data)}`);
+      result.response.failed.push({...booking, facebookMessage: response.response?.data?.error});
+      Logger.error(`Failed to request data: ${JSON.stringify(booking)} \nException : ${JSON.stringify(response.response?.data?.error)}`);
     }
   }
 
@@ -314,7 +316,8 @@ async function processDeliveryRequests(mappedDeliverys) {
     } else {
       failed++;
       result.response.failed.push(delivery)
-      Logger.error(`Failed to request data: ${JSON.stringify(delivery)} \nException : ${JSON.stringify(response.response.data)}`);
+      result.response.failed.push({...delivery, facebookMessage: response.response?.data?.error});
+      Logger.error(`Failed to request data: ${JSON.stringify(delivery)} \nException : ${JSON.stringify(response.response?.data?.error)}`);
     }
   }
 
@@ -346,7 +349,7 @@ async function saveTransferDelivery(fildName, lastTransfer, value) {
 async function deliveryLead() {
   try {
     const dataListDelivery = await findAllDelivery()
-    const currentDete = getDateFromNow("", 1)
+    const currentDete = getDateFromNow(process.env.DATETIME_LEAD, 1)
     const lastTransfer = await historyTransfer({
       key: "C365_HistoryDelivery",
       field: "",
@@ -416,7 +419,6 @@ async function mapDataForMetaBooking(csvFileName, eventName) {
       return null;
     }
     const reformat = await records.map((record) => {
-      // const eventTime = Object.keys();
       return {
         event_name: eventName,
         event_time: moment(Date.parse(record.booking_date)).unix(),

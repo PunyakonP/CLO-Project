@@ -4,7 +4,7 @@ const Logger = require("../helpers/Logger");
 const CacheData = require("../helpers/connectRedis");
 const axios = require("axios");
 const http = axios.create({
-  baseURL: `${process.env.BASE_URL_FACEBOOK}/${process.env.VERSION_API_FACEBOOK}/${process.env.APP_ID}`,
+  baseURL: `${process.env.BASE_URL_FACEBOOK}/${process.env.VERSION_API_FACEBOOK}/${process.env.PIXEL_ID}`,
 });
 
 /**
@@ -12,10 +12,17 @@ const http = axios.create({
  * @returns {Promise}
  */
 async function getQuerifiedLead() {
-  let startDate = moment()
-    .subtract(1, "days")
-    .format(`YYYY-MM-DD 00:00:00.000`);
-  let endDate = moment().subtract(1, "days").format(`YYYY-MM-DD 23:59:59.999`);
+  let startDate = moment().subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 00:00:00.000`);
+  let endDate = moment().subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 23:59:59.999`);
+
+  const resultForResponse = {
+    message: "",
+    response: {
+      success: [],
+      failed: []
+    }
+  }
+
   const result = await MssqlConnection.executeQuery(
     `SELECT Lead_id, SendDate
       FROM TempTarget
@@ -25,20 +32,20 @@ async function getQuerifiedLead() {
   );
 
   if (!result || result.recordset.length <= 0) {
-    Logger.debug(
-      `This date: ${new Date().toLocaleDateString()} don't have data. Result: ${result.recordset.length
-      }`
-    );
-    return;
+    const message = `This date: ${new Date().toLocaleDateString()} don't have data. Result: ${result.recordset.length}`
+    Logger.debug(message);
+    resultForResponse.message = message
+    return resultForResponse;
   }
-
   Logger.info(`QuerifiedLead count: ${result.recordset.length}`);
 
   const mapQuelifiedLead = await mapDataForMeta("qualified", result.recordset);
-
   let success = 0;
   let failed = 0;
+
   for (i = 0; i < mapQuelifiedLead.length; i++) {
+
+    const queryParams = `?access_token=${process.env.ACCESS_TOKEN_FACEBOOK}`;
     const url = `/events${queryParams}`;
 
     const response = await http
@@ -49,31 +56,35 @@ async function getQuerifiedLead() {
 
     if (response.status == 200) {
       success++;
+      resultForResponse.response.success.push(mapQuelifiedLead[i])
       //to do make logging
       Logger.info(`Send request ${mapQuelifiedLead[i].event_name} lead(${mapQuelifiedLead[i].user_data.lead_id}) at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)}`);
-    } 
+    }
     else {
       failed++;
-      Logger.error(`⚠ Failed to request data: ${JSON.stringify(mapQuelifiedLead[i])} \nException : ${JSON.stringify(response.response.data)}`);
-    }
-    const message = `All request quelified Lead is success${success}, is failed${failed}`
-    Logger.debug(message);
+      resultForResponse.response.failed.push({ ...mapQuelifiedLead[i], facebookMessage: response.response?.data?.error })
+      Logger.error(`⚠ Failed to request data: ${JSON.stringify(mapQuelifiedLead[i])} \nException : ${JSON.stringify(response.response?.data?.error)}`);
 
-    const checkDuplicate = await CacheData.getData("Lead_Quelified", `${leadId}`);
-    if (checkDuplicate) {
-      Logger.warning(`This leadi_id: ${leadId} is exist in cached`);
-    } 
-    else {
-
-      const recoveryData = await CacheData.setData("Lead_Quelified", `${leadId}`, JSON.stringify(mapRawLead.data[0]));
-
-      if (!recoveryData) {
-        Logger.error(`Failed to insert Cashe data for: ${leadId}`)
+      const checkDuplicate = await CacheData.getData("Lead_Quelified", `${mapQuelifiedLead[i].user_data.lead_id}`);
+      if (checkDuplicate) {
+        Logger.warning(`This leadi_id: ${mapQuelifiedLead[i].user_data.lead_id} is exist in cached`);
       }
+      else {
+        const recoveryData = await CacheData.setData("Lead_Quelified", `${mapQuelifiedLead[i].user_data.lead_id}`, JSON.stringify(mapQuelifiedLead[0]));
+
+        if (!recoveryData) {
+          Logger.error(`Failed to insert Cashe data for: ${mapQuelifiedLead[i].user_data.lead_id}`)
+        }
+      }
+
+      Logger.info(`Created raw lead: ${mapQuelifiedLead[i].user_data.lead_id} to save cache successfully at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)}`);
     }
 
-    Logger.info(`Created raw lead: ${leadId} to save cache successfully at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)}`);
   }
+  const message = `All request quelified Lead is success => ${success}, is failed => ${failed}`
+  resultForResponse.message = message;
+  Logger.debug(message);
+  return resultForResponse;
 }
 
 /**
@@ -83,6 +94,7 @@ async function getQuerifiedLead() {
  */
 async function getInitialLead(data) {
   const { createdTime, leadgenId } = data;
+  Logger.info(`raw data from webhook ${createdTime} , ${leadgenId}`)
   if (!data) {
     Logger.warning(`The parameter data is required`);
     return;
@@ -91,8 +103,8 @@ async function getInitialLead(data) {
   const mapRawLead = {
     data: [
       {
-        event_name: "qualified",
-        event_time: createdTime,
+        event_name: "initial_lead",
+        event_time: moment(createdTime).unix(),
         action_source: "system_generated",
         user_data: {
           lead_id: leadgenId,
@@ -105,29 +117,42 @@ async function getInitialLead(data) {
     ],
   };
 
-  Logger.info('Map data from webhook', JSON.stringify(mapRawLead));
+  const result = {
+    message: "",
+    response: {
+      success: [],
+      failed: []
+    }
+  }
+
+  Logger.info(`Map data from webhook, \n${JSON.stringify(mapRawLead, null, 2)}`);
 
   const queryParams = `?access_token=${process.env.ACCESS_TOKEN_FACEBOOK}`;
-
   const response = await http
-    .post(`/events${queryParams}`, JSON.stringify(mapRawLead))
+    .post(`/events${queryParams}`, mapRawLead)
     .catch((error) => {
       return error;
     });
 
   if (response.status == 200) {
-    Logger.info(
-      `Send request ${mapRawLead.data[0].event_name} lead(${mapRawLead.data[0].user_data.lead_id}) at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)}`);
-  } 
+    const messageResponse = `Send request ${mapRawLead.data[0].event_name} lead(${mapRawLead.data[0].user_data.lead_id}) at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)}`
+    result.message = messageResponse
+    result.response.success.push(mapRawLead.data[0])
+    Logger.info(messageResponse);
+  }
   else {
-    Logger.error(`⚠ Failed to request data: ${JSON.stringify(mapRawLead.data[0])} \nException : ${JSON.stringify(response.response.data)}`);
+    const messageResponse = `⚠ Failed to request data: ${JSON.stringify(mapRawLead.data[0], null, 2)} `
+    const facebookResponse = `${JSON.stringify(response.response?.data?.error, null, 2)}`
+    result.message = messageResponse
+    result.response.failed.push({ ...mapRawLead.data[0], facebookMessage: response.response?.data?.error });
+    Logger.error(`${messageResponse} \nException: ${facebookResponse}`);
     //to do make cashe Redis
     const leadId = mapRawLead.data[0].user_data.lead_id;
-      Logger.info(`Initial lead data: ${leadId}`);
+    Logger.info(`Initial lead data: ${leadId}`);
     const checkDuplicate = await CacheData.getData("Lead_Initial", `${leadId}`);
     if (checkDuplicate) {
       Logger.warning(`This leadi_id: ${leadId} is exist in cached`);
-    } 
+    }
     else {
 
       const recoveryData = await CacheData.setData("Lead_Initial", `${leadId}`, JSON.stringify(mapRawLead.data[0]));
@@ -139,6 +164,8 @@ async function getInitialLead(data) {
 
     Logger.info(`Created raw lead: ${leadId} to save cache successfully at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)}`);
   }
+
+  return result
 }
 
 /**

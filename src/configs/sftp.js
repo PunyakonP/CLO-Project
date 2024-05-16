@@ -3,8 +3,7 @@ const configSFTP = {
 	'port': process.env.SFTP_PORT,
 	'username': process.env.SFTP_USERNAME,
 	'password': process.env.SFTP_PASSWORD,
-	'retries': 3,
-	'debug': console.log
+	'retries': 3
 }
 
 module.exports = configSFTP

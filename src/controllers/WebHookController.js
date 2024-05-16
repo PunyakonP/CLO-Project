@@ -32,7 +32,7 @@ exports.webHookFacebook = async (req, res, next) => {
     // Request API Graph Facebook
     const param = `?access_token=${process.env.APP_FACEBOOK_ACCESS_TOKEN}`;
     const result = await axios.get(
-      `${process.env.GRAPH_FACEBOOK_API_URL}/${leadgen_id}${param}`
+      `${process.env.BASE_URL_FACEBOOK}/${process.env.VERSION_API_FACEBOOK}/${leadgen_id}${param}`
     );
 
     const { created_time, id } = result.data;

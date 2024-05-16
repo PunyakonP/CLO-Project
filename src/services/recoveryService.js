@@ -22,6 +22,9 @@ async function recoveryBooking() {
   }
   Logger.info(`Date diff is : ${countRecovery}`);
 
+  let success = 0;
+  let failed = 0;
+  
   for (i = 0; i < countRecovery; i++) {
 
     const dataListBooking = await findAllBooking();
@@ -58,9 +61,6 @@ async function recoveryBooking() {
       return result;
     }
 
-    let success = 0;
-    let failed = 0;
-
     for (j = 0; j < mappedBookings.length; j++) {
       const queryParams = `?access_token=${process.env.ACCESS_TOKEN_FACEBOOK}`;
       const url = `/events${queryParams}`;
@@ -82,36 +82,23 @@ async function recoveryBooking() {
       } else {
         failed++;
         result.response.failed.push(mappedBookings[j])
+        result.response.failed.push({ ...mappedBookings[i], facebookMessage: response.response?.data?.error });
         Logger.error(
           `⚠ Failed to request data: ${JSON.stringify(
             mappedBookings[j]
-          )} \nException : ${JSON.stringify(response.response.data)}`
+          )} \nException : ${JSON.stringify(response.response?.data?.error)}`
         );
         // to do make cashe Redis
-        // for (i = failed; i < mappedBookings.length; i++) {
 
-        //     const checkDuplicate = CacheData.getData(mappedBookings[i].user_data.lead_id)
-        //     if (checkDuplicate) {
-        //         Logger.warning(`This leadi_id: ${mappedBookings[i].user_data.lead_id} is exist in cached`);
-        //     } else {
-        //         const recoveryData = { key: `${mappedBookings[i].user_data.lead_id}`, value: JSON.stringify(mappedBookings[i]) }
-        //         await CacheData.setData(recoveryData);
-        //     }
-        // }
-        // Logger.info(
-        //   `Saved cache successfully at ${moment().format(
-        //     `YYYY-MM-DD HH:mm:ss.SSS`
-        //   )} `
-        // );
       }
     }
-
-    const messageLog = `All request quelified Lead is success => ${success}, is failed => ${failed}`;
-    result.message = messageLog
-    Logger.debug(messageLog);
-
     await saveTransferRecord(bookingFindName, lastTransfer, messageLog);
   }
+
+  const messageLog = `All request quelified Lead is success => ${success}, is failed => ${failed}`;
+  result.message = messageLog
+  Logger.debug(messageLog);
+
 
   return result;
 }
@@ -184,22 +171,7 @@ async function findAllDelivery() {
   return dataListDelivery;
 }
 
-async function countGetFile() {
-  const lastTransfer = await historyTransfer({
-    key: "C365_HistoryBooking",
-    field: "",
-    fieldDel: "",
-    value: "",
-    type: "lasted",
-  });
-  const subtractDete = getDateSubtract("2024-05-08T12:38:56.207Z", 1);
-  const checkDate = determineCheckDate(lastTransfer, subtractDete);
-  const nextDate = moment(checkDate).add(1, "days").format("DDMMYYYY");
 
-  const currentDate = await getCurrentTimestamp("2024-05-08T12:38:56.207Z");
-  const countRecovery = await differentDate(checkDate, currentDate);
-  return countRecovery;
-}
 
 async function countGetFileDelivery() {
   const lastTransfer = await historyTransfer({
@@ -209,11 +181,11 @@ async function countGetFileDelivery() {
     value: "",
     type: "lasted",
   });
-  const subtractDete = getDateSubtract("2024-05-08T12:38:56.207Z", 1);
+  const subtractDete = getDateSubtract(process.env.DATETIME_LEAD, 1);
   const checkDate = determineCheckDate(lastTransfer, subtractDete);
   const nextDate = moment(checkDate).add(1, "days").format("DDMMYYYY");
 
-  const currentDate = await getCurrentTimestamp("2024-05-08T12:38:56.207Z");
+  const currentDate = await getCurrentTimestamp(process.env.DATETIME_LEAD);
   const countRecovery = await differentDate(checkDate, currentDate);
   if (countRecovery != 0) {
     await recoveryDelivery();
@@ -324,6 +296,18 @@ function findMatchingDelivery(dataList, checkDate) {
 async function recoveryDelivery() {
   const countRecovery = await countGetFileDelivery();
 
+  const result = {
+    message: "",
+    notFound: [],
+    response: {
+      success: [],
+      failed: []
+    }
+  }
+
+  let success = 0;
+  let failed = 0;
+  
   Logger.info(`Date diff is : ${countRecovery}`);
 
   for (i = 0; i < countRecovery; i++) {
@@ -361,8 +345,7 @@ async function recoveryDelivery() {
       return true;
     }
 
-    let success = 0;
-    let failed = 0;
+   
 
     for (i = 0; i < mappedDelivery.length; i++) {
       const queryParams = `?access_token=${process.env.ACCESS_TOKEN_FACEBOOK}`;
@@ -376,6 +359,7 @@ async function recoveryDelivery() {
 
       if (response.status == 200) {
         success++;
+        result.response.success.push(mappedDelivery[i])
         //to do make logging
         Logger.info(
           `Send request ${mappedDelivery[i].event_name} lead(${mappedDelivery[i].user_data.lead_id
@@ -383,39 +367,25 @@ async function recoveryDelivery() {
         );
       } else {
         failed++;
+        result.response.failed.push({ ...mappedDelivery[i], facebookMessage: response.response?.data?.error });
         Logger.error(
           `⚠ Failed to request data: ${JSON.stringify(
             mappedDelivery[i]
-          )} \nException : ${JSON.stringify(response.response.data)}`
+          )} \nException : ${JSON.stringify(response.response?.data?.error)}`
         );
         // to do make cashe Redis
-        // for (i = failed; i < mappedBookings.length; i++) {
-
-        //     const checkDuplicate = CacheData.getData(mappedBookings[i].user_data.lead_id)
-        //     if (checkDuplicate) {
-        //         Logger.warning(`This leadi_id: ${mappedBookings[i].user_data.lead_id} is exist in cached`);
-        //     } else {
-        //         const recoveryData = { key: `${mappedBookings[i].user_data.lead_id}`, value: JSON.stringify(mappedBookings[i]) }
-        //         await CacheData.setData(recoveryData);
-        //     }
-        // }
-        // Logger.info(
-        //   `Saved cache successfully at ${moment().format(
-        //     `YYYY-MM-DD HH:mm:ss.SSS`
-        //   )} `
-        // );
+        
       }
     }
-
-    const messageLog = `All request quelified Lead is success => ${success}, is failed => ${failed}`;
-    Logger.debug(messageLog);
 
     await saveTransferRecord(fileContent, lastTransfer, messageLog);
     Logger.info(`Create a new history: ${fileContent} with data`);
   }
+  const messageLog = `All request quelified Lead is success => ${success}, is failed => ${failed}`;
+  Logger.debug(messageLog);
+  result.message = messageLog
 
-  await countGetFile();
-  return true;
+  return result;
 }
 
 /**
