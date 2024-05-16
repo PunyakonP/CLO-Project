@@ -12,10 +12,8 @@ const http = axios.create({
  * @returns {Promise}
  */
 async function getQuerifiedLead() {
-  let startDate = moment()
-    .subtract(1, "days")
-    .format(`YYYY-MM-DD 00:00:00.000`);
-  let endDate = moment().subtract(1, "days").format(`YYYY-MM-DD 23:59:59.999`);
+  let startDate = moment().subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 00:00:00.000`);
+  let endDate = moment().subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 23:59:59.999`);
 
   const resultForResponse = {
     message: "",
@@ -83,7 +81,7 @@ async function getQuerifiedLead() {
     }
 
   }
-  const message = `All request quelified Lead is success${success}, is failed${failed}`
+  const message = `All request quelified Lead is success => ${success}, is failed => ${failed}`
   resultForResponse.message = message;
   Logger.debug(message);
   return resultForResponse;
