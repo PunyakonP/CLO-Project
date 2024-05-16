@@ -12,9 +12,16 @@ const http = axios.create({
  * @returns {Promise}
  */
 async function getQuerifiedLead() {
-  let startDate = moment().subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 00:00:00.000`);
-  let endDate = moment().subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 23:59:59.999`);
+  let startDate;
+  let endDate;
 
+  if (process.env.INITIAL_DATA == 'Y') {
+    startDate = moment(process.env.INITIAL_START).subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 00:00:00.000`);
+    endDate = moment(process.env.INITIAL_END).subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 23:59:59.999`);
+  } else {
+    startDate = moment().subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 00:00:00.000`);
+    endDate = moment().subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 23:59:59.999`);
+  }
   const resultForResponse = {
     message: "",
     response: {
@@ -70,7 +77,7 @@ async function getQuerifiedLead() {
         Logger.warning(`This leadi_id: ${mapQuelifiedLead[i].user_data.lead_id} is exist in cached`);
       }
       else {
-        const recoveryData = await CacheData.setData("Lead_Quelified", `${mapQuelifiedLead[i].user_data.lead_id}`, JSON.stringify(mapQuelifiedLead[0]));
+        const recoveryData = await CacheData.setData("Lead_Quelified", `${moment().format('YYYY-MM-DDTHH:mm:ss')}`, JSON.stringify(mapQuelifiedLead[0]));
 
         if (!recoveryData) {
           Logger.error(`Failed to insert Cashe data for: ${mapQuelifiedLead[i].user_data.lead_id}`)
@@ -98,6 +105,12 @@ async function getInitialLead(data) {
   if (!data) {
     Logger.warning(`The parameter data is required`);
     return;
+  }
+
+  const checkCache = await CacheData.getAll('Lead_Initial');
+  if (Object.values(checkCache).join('') != '') {
+    const reSendData = await recoveryInitial(checkCache);
+
   }
 
   const mapRawLead = {
@@ -155,7 +168,7 @@ async function getInitialLead(data) {
     }
     else {
 
-      const recoveryData = await CacheData.setData("Lead_Initial", `${leadId}`, JSON.stringify(mapRawLead.data[0]));
+      const recoveryData = await CacheData.setData("Lead_Initial", `${leadId}_${moment().format('YYYYMMDDHHmmss')}`, JSON.stringify(mapRawLead.data[0]));
 
       if (!recoveryData) {
         Logger.error(`Failed to insert Cashe data for: ${leadId}`)
@@ -168,6 +181,16 @@ async function getInitialLead(data) {
   return result
 }
 
+async function recoveryInitial(oldInitial) {
+  if (!oldInitial) {
+    Logger.warning(`request data for recovery initial lead`)
+    return
+  }
+  // for(i = 0; i < oldInitial.length ; i++) {
+  const mapInitialLead = await mapDataForMeta(Object.values(oldInitial).join(''))
+  // }
+}
+
 /**
  * map data to meta template
  * @param {string} eventName
@@ -175,6 +198,25 @@ async function getInitialLead(data) {
  */
 async function mapDataForMeta(eventName, data) {
   try {
+    if (eventName === 'initial_lead') {
+      const reformat = data.map((record) => {
+        return {
+          event_name: eventName,
+          event_time: record.event_time,
+          action_source: "system_generated",
+          user_data: {
+            lead_id: record.lead_id,
+          },
+          custom_data: {
+            event_source: "crm",
+            lead_event_source: "toyota crm",
+          },
+        };
+      });
+
+      Logger.info(`Result =>>  ${eventName}`, reformat);
+      return reformat;
+    }
     const reformat = data.map((record) => {
       return {
         event_name: eventName,
@@ -196,5 +238,6 @@ async function mapDataForMeta(eventName, data) {
     Logger.error(`⚠ Failed to map data: ${data} \nException : ${error}`);
   }
 }
+
 
 module.exports = { getQuerifiedLead, getInitialLead };

@@ -20,7 +20,7 @@ async function recoveryBooking() {
       failed: []
     }
   }
-  Logger.info(`Date diff is : ${countRecovery}`);
+  Logger.info(`Date is diff: ${countRecovery}`);
 
   let success = 0;
   let failed = 0;
@@ -101,6 +101,43 @@ async function recoveryBooking() {
 
 
   return result;
+}
+
+async function countGetFile(){
+
+  const lastTransfer = await historyTransfer({
+    key: "C365_HistoryBooking",
+    field: "",
+    fieldDel: "",
+    value: "",
+    type: "lasted",
+  });
+  const subtractDete = getDateSubtract(process.env.DATETIME_LEAD, 1);
+  const checkDate = determineCheckDate(lastTransfer, subtractDete);
+  const nextDate = moment(checkDate).add(1, "days").format("DDMMYYYY");
+
+  const currentDate = await getCurrentTimestamp(process.env.DATETIME_LEAD);
+  const countRecovery = await differentDate(checkDate, currentDate);
+  // if (countRecovery != 0) {
+  //   await recoveryDelivery();
+  // }
+  return countRecovery;
+}
+
+function findCreateDateBooking(dataList) {
+  let regex = /\d{8}(?=\d{6}_\d{8}\.txt)/;
+  const checkDate = moment().format('YYYYMMDD')
+
+  const listMatch = []
+
+  for( const booking of dataList){
+    const match = booking.name.match(regex);
+    if (match && match[1] == checkDate) {
+      Logger.info(`Found booking: ${booking.name}`);
+       listMatch.push(booking.name);
+    }
+  }
+  return listMatch;
 }
 
 function findMatchingBooking(dataList, checkDate) {
