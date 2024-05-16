@@ -59,4 +59,4 @@ jobs:
           app-name: 'web-clo-prod'
           slot-name: 'Production'
           package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_2DBB74A5283B4150A1BFFB5A06668DC9 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_PROD }}
