@@ -126,7 +126,7 @@ async function downloadBookFile(fileName) {
 
 function getDateFromNow(baseDate, dayOffset) {
   if (baseDate) return moment(baseDate).subtract(dayOffset, 'days').format("DDMMYYYY").toString();
-  return moment().subtract(dayOffset, 'days').format("DDMMYYYY").toString();;
+  return moment().subtract(dayOffset, 'days').format("DDMMYYYY").toString();
 }
 
 function findMatchingBooking(dataList, checkDate) {
