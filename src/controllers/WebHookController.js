@@ -3,6 +3,7 @@ const httpStatus = require("http-status");
 const Logger = require("../helpers/Logger");
 const axios = require("axios");
 const soap = require("soap");
+const serviceLeadConversion = require('../services/leadConversionServies')
 
 exports.verifyRequestSignature = async (req, res) => {
   const mode = req.query["hub.mode"];
@@ -31,15 +32,20 @@ exports.webHookFacebook = async (req, res, next) => {
     // Request API Graph Facebook
     const param = `?access_token=${process.env.APP_FACEBOOK_ACCESS_TOKEN}`;
     const result = await axios.get(
-      `${process.env.GRAPH_FACEBOOK_API_URL}/${leadgen_id}${param}`
+      `${process.env.BASE_URL_FACEBOOK}/${process.env.VERSION_API_FACEBOOK}/${leadgen_id}${param}`
     );
 
     const { created_time, id } = result.data;
 
     // HTTP Request
-    await axios.post(`${process.env.TCAP_API_URL}/api/transfers/initial`, {
-      createdTime: created_time,
-      leadgenId: id,
+    // await axios.post(`${process.env.TCAP_API_URL}/api/transfers/initial`, {
+    //   "createdTime": created_time,
+    //   "leadgenId": id,
+    // });
+
+    await serviceLeadConversion.getInitialLead({
+      "createdTime": created_time,
+      "leadgenId": id,
     });
 
     Logger.info("Successfully request HTTP API TCAP", {

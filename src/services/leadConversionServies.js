@@ -1,222 +1,243 @@
-const MssqlConnection = require('../helpers/MssqlConnection');
-const moment = require('moment')
-const Logger = require('../helpers/Logger');
-const CacheData = require('../helpers/connectRedis')
-const axios = require('axios')
-const { HttpClient } = require('../lib');
-const http = new HttpClient({
-    baseURL: `${process.env.BASE_URL_FACEBOOK}/${process.env.VERSION_API_FACEBOOK}/${process.env.APP_ID}`
-})
-// const httpV2 = axios.create({
-//     baseURL: `${process.env.BASE_URL_FACEBOOK}/${process.env.VERSION_API_FACEBOOK}/${process.env.APP_ID}`
-// })
+const MssqlConnection = require("../helpers/MssqlConnection");
+const moment = require("moment");
+const Logger = require("../helpers/Logger");
+const CacheData = require("../helpers/connectRedis");
+const axios = require("axios");
+const http = axios.create({
+  baseURL: `${process.env.BASE_URL_FACEBOOK}/${process.env.VERSION_API_FACEBOOK}/${process.env.PIXEL_ID}`,
+});
+
 /**
  * get data
  * @returns {Promise}
  */
 async function getQuerifiedLead() {
-    let startDate = moment().subtract(1, 'days').format(`YYYY-MM-DD 00:00:00.000`);
-    let endDate = moment().subtract(1, 'days').format(`YYYY-MM-DD 23:59:59.999`);
-    const result = await MssqlConnection.executeQuery(`SELECT Lead_id, SendDate
+  let startDate;
+  let endDate;
+
+  if (process.env.INITIAL_DATA == 'Y') {
+    startDate = moment(process.env.INITIAL_START).subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 00:00:00.000`);
+    endDate = moment(process.env.INITIAL_END).subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 23:59:59.999`);
+  } else {
+    startDate = moment().subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 00:00:00.000`);
+    endDate = moment().subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 23:59:59.999`);
+  }
+  const resultForResponse = {
+    message: "",
+    response: {
+      success: [],
+      failed: []
+    }
+  }
+
+  const result = await MssqlConnection.executeQuery(
+    `SELECT Lead_id, SendDate
       FROM TempTarget
-      WHERE SendDate between '2024-04-30 00:00:00.000' and '2024-04-30 23:59:59.999'
-      order by ID desc`, [
-        { String }
-    ])
+      WHERE SendDate between '${startDate}' and '${endDate}'
+      order by ID desc`,
+    [{ String }]
+  );
 
-    if (!result || result.recordset.length <= 0) {
-        Logger.debug(`This date: ${new Date().toLocaleDateString()} don't have data. Result: ${result.recordset.length}`)
-        return;
+  if (!result || result.recordset.length <= 0) {
+    const message = `This date: ${new Date().toLocaleDateString()} don't have data. Result: ${result.recordset.length}`
+    Logger.debug(message);
+    resultForResponse.message = message
+    return resultForResponse;
+  }
+  Logger.info(`QuerifiedLead count: ${result.recordset.length}`);
+
+  const mapQuelifiedLead = await mapDataForMeta("qualified", result.recordset);
+  let success = 0;
+  let failed = 0;
+
+  for (i = 0; i < mapQuelifiedLead.length; i++) {
+
+    const queryParams = `?access_token=${process.env.ACCESS_TOKEN_FACEBOOK}`;
+    const url = `/events${queryParams}`;
+
+    const response = await http
+      .post(url, { data: [mapQuelifiedLead[i]] })
+      .catch((error) => {
+        return error;
+      });
+
+    if (response.status == 200) {
+      success++;
+      resultForResponse.response.success.push(mapQuelifiedLead[i])
+      //to do make logging
+      Logger.info(`Send request ${mapQuelifiedLead[i].event_name} lead(${mapQuelifiedLead[i].user_data.lead_id}) at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)}`);
     }
-    Logger.info(`QuerifiedLead count: ${result.recordset.length}`)
-    const mapQuelifiedLead = await mapDataForMeta('qualified', result.recordset);
-    console.log('timestamp', mapQuelifiedLead);
+    else {
+      failed++;
+      resultForResponse.response.failed.push({ ...mapQuelifiedLead[i], facebookMessage: response.response?.data?.error })
+      Logger.error(`⚠ Failed to request data: ${JSON.stringify(mapQuelifiedLead[i])} \nException : ${JSON.stringify(response.response?.data?.error)}`);
 
-    let quelified = [
-        {
-            "event_name": "qualified",
-            "event_time": 1714459338,
-            "action_source": "system_generated",
-            "user_data": {
-                "lead_id": "1"
-            },
-            "custom_data": {
-                "event_source": "crm",
-                "lead_event_source": "toyota crm"
-            }
+      const checkDuplicate = await CacheData.getData("Lead_Quelified", `${mapQuelifiedLead[i].user_data.lead_id}`);
+      if (checkDuplicate) {
+        Logger.warning(`This leadi_id: ${mapQuelifiedLead[i].user_data.lead_id} is exist in cached`);
+      }
+      else {
+        const recoveryData = await CacheData.setData("Lead_Quelified", `${moment().format('YYYY-MM-DDTHH:mm:ss')}`, JSON.stringify(mapQuelifiedLead[0]));
+
+        if (!recoveryData) {
+          Logger.error(`Failed to insert Cashe data for: ${mapQuelifiedLead[i].user_data.lead_id}`)
+        }
+      }
+
+      Logger.info(`Created raw lead: ${mapQuelifiedLead[i].user_data.lead_id} to save cache successfully at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)}`);
+    }
+
+  }
+  const message = `All request quelified Lead is success => ${success}, is failed => ${failed}`
+  resultForResponse.message = message;
+  Logger.debug(message);
+  return resultForResponse;
+}
+
+/**
+ *
+ * @param { } data
+ * @returns
+ */
+async function getInitialLead(data) {
+  const { createdTime, leadgenId } = data;
+  Logger.info(`raw data from webhook ${createdTime} , ${leadgenId}`)
+  if (!data) {
+    Logger.warning(`The parameter data is required`);
+    return;
+  }
+
+  const checkCache = await CacheData.getAll('Lead_Initial');
+  if (Object.values(checkCache).join('') != '') {
+    const reSendData = await recoveryInitial(checkCache);
+
+  }
+
+  const mapRawLead = {
+    data: [
+      {
+        event_name: "initial_lead",
+        event_time: moment(createdTime).unix(),
+        action_source: "system_generated",
+        user_data: {
+          lead_id: leadgenId,
         },
-        {
-            "event_name": "qualified",
-            "event_time": 1714459338,
-            "action_source": "system_generated",
-            "user_data": {
-                "lead_id": "985686259580664"
-            },
-            "custom_data": {
-                "event_source": "crm",
-                "lead_event_source": "toyota crm"
-            }
-        }, {
-            "event_name": "qualified",
-            "event_time": 1714459338,
-            "action_source": "system_generated",
-            "user_data": {
-                "lead_id": "985686259580664"
-            },
-            "custom_data": {
-                "event_source": "crm",
-                "lead_event_source": "toyota crm"
-            }
-        }
-    ]
+        custom_data: {
+          event_source: "crm",
+          lead_event_source: "toyota_crm",
+        },
+      },
+    ],
+  };
 
-    const url = 'https://graph.facebook.com/v19.0/1618011605605581/events?access_token=EAAMgDW042TwBO5tXy7hazTZAWIBIApZCGRd1bfDFh6wE9ZBVGmqlCK3AKMrMPm9b1t8XdxwZBlyIqVwkE8CklgXUVlHF1N2Mnrmkn10Y60TgSBQtaWkEETfqvsX0SLwyuBZAb5jAk5eFDBMZA4yTDiityZAuhVowNIuXXhJPZCbXH9SbfcSoYx7blUgAxOuKEHiprwZDZD'
-
-    let indexs = 0
-    try {
-        // console.log('testttt', quelified.length);
-        for (i = 0; i < mapQuelifiedLead.length; i++) {
-            indexs = i
-
-            // console.log('test', mapQuelifiedLead[i]);
-            const res = await axios.post(url, {
-                "data": [
-                    {
-                        "event_name": "qualified",
-                        "event_time": mapQuelifiedLead[i].event_time,
-                        "action_source": "system_generated",
-                        "user_data": {
-                            "lead_id": mapQuelifiedLead[i].user_data.lead_id
-                        },
-                        "custom_data": {
-                            "event_source": "crm",
-                            "lead_event_source": "toyota crm"
-                        }
-                    }
-                ]
-            })
-            console.log(res);
-            //to do make logging
-            Logger.info(`Send request mapQuelifiedLead lead(${mapQuelifiedLead[i].user_data.lead_id}) at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)} `);
-        }
-        Logger.debug('All request is success')
-        // console.log('qwwqwq', mapQuelifiedLead);
-        return true;
+  const result = {
+    message: "",
+    response: {
+      success: [],
+      failed: []
     }
-    catch (error) {
-        // console.log('err', error);
-        Logger.error(`⚠ Failed to request data`)
-        //to do make cashe Redis
-        // for (i = indexs; i < mapQuelifiedLead.length; i++) {
-        //     const checkDuplicate = CacheData.getData(mapQuelifiedLead[i].user_data.lead_id)
-        //     if (checkDuplicate) {
-        //         Logger.warning(`This leadi_id: ${mapQuelifiedLead[i].user_data.lead_id} is exist in cached`);
-        //     } else {
-        //         const recoveryData = { key: `${mapQuelifiedLead[i].user_data.lead_id}`, value: JSON.stringify(mapQuelifiedLead[i]) }
-        //         await CacheData.setData(recoveryData);
-        //     }
-        // }
-        // Logger.info(`Saved cache successfully at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)} `);
-        throw error
+  }
+
+  Logger.info(`Map data from webhook, \n${JSON.stringify(mapRawLead, null, 2)}`);
+
+  const queryParams = `?access_token=${process.env.ACCESS_TOKEN_FACEBOOK}`;
+  const response = await http
+    .post(`/events${queryParams}`, mapRawLead)
+    .catch((error) => {
+      return error;
+    });
+
+  if (response.status == 200) {
+    const messageResponse = `Send request ${mapRawLead.data[0].event_name} lead(${mapRawLead.data[0].user_data.lead_id}) at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)}`
+    result.message = messageResponse
+    result.response.success.push(mapRawLead.data[0])
+    Logger.info(messageResponse);
+  }
+  else {
+    const messageResponse = `⚠ Failed to request data: ${JSON.stringify(mapRawLead.data[0], null, 2)} `
+    const facebookResponse = `${JSON.stringify(response.response?.data?.error, null, 2)}`
+    result.message = messageResponse
+    result.response.failed.push({ ...mapRawLead.data[0], facebookMessage: response.response?.data?.error });
+    Logger.error(`${messageResponse} \nException: ${facebookResponse}`);
+    //to do make cashe Redis
+    const leadId = mapRawLead.data[0].user_data.lead_id;
+    Logger.info(`Initial lead data: ${leadId}`);
+    const checkDuplicate = await CacheData.getData("Lead_Initial", `${leadId}`);
+    if (checkDuplicate) {
+      Logger.warning(`This leadi_id: ${leadId} is exist in cached`);
     }
+    else {
+
+      const recoveryData = await CacheData.setData("Lead_Initial", `${leadId}_${moment().format('YYYYMMDDHHmmss')}`, JSON.stringify(mapRawLead.data[0]));
+
+      if (!recoveryData) {
+        Logger.error(`Failed to insert Cashe data for: ${leadId}`)
+      }
+    }
+
+    Logger.info(`Created raw lead: ${leadId} to save cache successfully at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)}`);
+  }
+
+  return result
 }
-// /**
-//  * request Data per lead
-//  * @param {} data 
-//  * @returns 
-//  */
-// async function multiRequestHttp(data) {
-//     const queryParams = `?access_token=${process.env.ACCESS_TOKEN_FACEBOOK}`
-//     let indexs = 0
-//     try {
-//         for (i = 0; i < data.length; i++) {
-//             indexs = i
 
-//             await http.post(`/events${queryParams}`, {
-//                 "data": [
-//                     data[i]
-//                 ]
-//             })
-//             //to do make logging
-//             Logger.info(`Send request ${data[i].event_name} lead(${data[i].user_data.lead_id}) at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)} `);
-//         }
-//         Logger.debug('All request is success')
-//         return true;
-//     }
-//     catch (error) {
-//         // console.log('err', error);
-//         Logger.error(`⚠ Failed to request data`)
-//         //to do make cashe Redis
-//         for (i = indexs; i < data.length; i++) {
-//             const checkDuplicate = CacheData.getData(data[i].user_data.lead_id)
-//             if (checkDuplicate) {
-//                 Logger.warning(`This leadi_id: ${data[i].user_data.lead_id} is exist in cached`);
-//             } else {
-//                 const recoveryData = { key: `${data[i].user_data.lead_id}`, value: JSON.stringify(data[i]) }
-//                 await CacheData.setData(recoveryData);
-//             }
-//         }
-//         Logger.info(`Saved cache successfully at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)} `);
-//         throw error
-//     }
-// }
-
-async function getRawLead(data) {
-    if (!data) {
-        Logger.warning(`The parameter data is required`);
-        return;
-    }
-    const mapRawLead = await mapDataForMeta('initial_lead', data);
-    const queryParams = `?access_token=${process.env.ACCESS_TOKEN_FACEBOOK}`
-    try {
-        const responseRawLead = await axios.post(`/events${queryParams}`, { data: mapRawLead })
-        //to do make logging
-        Logger.info(`Send request at ${moment().format(`YYYY-MM-DD HH:mm:ss.SSS`)}`)
-        return responseRawLead;
-    }
-    catch (error) {
-        Logger.error(`⚠ Failed to request data: ${JSON.stringify(mapRawLead)} \nException : ${error}`)
-        //to do make cashe Redis
-        const checkDuplicate = CacheData.getData(mapRawLead.user_data.lead_id)
-        if (checkDuplicate === 'OK') {
-            Logger.warning(`This leadi_id: ${mapRawLead.user_data.lead_id} is exist in cached`);
-            return;
-        }
-        const recoveryData = { key: `${mapRawLead.user_data.lead_id}`, value: JSON.stringify(mapRawLead) }
-        await CacheData.setData(recoveryData);
-    }
+async function recoveryInitial(oldInitial) {
+  if (!oldInitial) {
+    Logger.warning(`request data for recovery initial lead`)
+    return
+  }
+  // for(i = 0; i < oldInitial.length ; i++) {
+  const mapInitialLead = await mapDataForMeta(Object.values(oldInitial).join(''))
+  // }
 }
+
 /**
  * map data to meta template
- * @param {string} eventName 
- * @param {*} data 
+ * @param {string} eventName
+ * @param {*} data
  */
 async function mapDataForMeta(eventName, data) {
-    try {
-        const reformat = data.map((record) => {
-            return {
-                event_name: eventName,
-                event_time: moment(record.SendDate).unix(),
-                action_source: 'system_generated',
-                user_data: {
-                    lead_id: record.Lead_id,
-                },
-                custom_data: {
-                    event_source: "crm",
-                    lead_event_source: "toyota crm"
+  try {
+    if (eventName === 'initial_lead') {
+      const reformat = data.map((record) => {
+        return {
+          event_name: eventName,
+          event_time: record.event_time,
+          action_source: "system_generated",
+          user_data: {
+            lead_id: record.lead_id,
+          },
+          custom_data: {
+            event_source: "crm",
+            lead_event_source: "toyota crm",
+          },
+        };
+      });
 
-                }
-
-            }
-        });
-
-        Logger.info(`Result =>>  ${eventName}`, reformat);
-        return reformat;
-
-    } catch (error) {
-        Logger.error(`⚠ Failed to map data: ${data} \nException : ${error}`)
+      Logger.info(`Result =>>  ${eventName}`, reformat);
+      return reformat;
     }
+    const reformat = data.map((record) => {
+      return {
+        event_name: eventName,
+        event_time: moment(record.SendDate).unix(),
+        action_source: "system_generated",
+        user_data: {
+          lead_id: record.Lead_id,
+        },
+        custom_data: {
+          event_source: "crm",
+          lead_event_source: "toyota crm",
+        },
+      };
+    });
 
+    Logger.info(`Result =>>  ${eventName}`, reformat);
+    return reformat;
+  } catch (error) {
+    Logger.error(`⚠ Failed to map data: ${data} \nException : ${error}`);
+  }
 }
 
-module.exports = { getQuerifiedLead, getRawLead }
+
+module.exports = { getQuerifiedLead, getInitialLead };
