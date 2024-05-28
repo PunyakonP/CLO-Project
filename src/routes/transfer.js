@@ -4,7 +4,7 @@ const transferController = require('../controllers/TransferController');
 
 router.get('/booking', transferController.getBookingLead);
 router.get('/delivery', transferController.getDeliveryLead);
-router.get('/quelified', transferController.getQuelifiedLead);
+router.get('/qualified', transferController.getQuelifiedLead);
 router.post('/initial', transferController.getInitialLead);
 
 module.exports = router;

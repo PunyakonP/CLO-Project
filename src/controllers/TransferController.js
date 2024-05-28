@@ -10,7 +10,7 @@ exports.getQuelifiedLead = async (req, res, next) => {
   try {
     const request = await runValidation({}, joi.object());
     const result = await leadConversionServies.getQuerifiedLead();
-    await createAndUploadFile(result, 'trans_quelified_lead')
+    await createAndUploadFile(result, 'trans_qualified_lead')
 
     Logger.info(`Successfully get API identity: ${result}`, {
       result,

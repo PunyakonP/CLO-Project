@@ -1,5 +1,6 @@
 const MssqlConnection = require("../helpers/MssqlConnection");
 const moment = require("moment");
+moment.defaultFormat = moment.ISO_8601
 const Logger = require("../helpers/Logger");
 const CacheData = require("../helpers/connectRedis");
 const axios = require("axios");
@@ -16,8 +17,8 @@ async function getQuerifiedLead() {
   let endDate;
 
   if (process.env.INITIAL_DATA == 'Y') {
-    startDate = moment(process.env.INITIAL_START).subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 00:00:00.000`);
-    endDate = moment(process.env.INITIAL_END).subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 23:59:59.999`);
+    startDate = moment(`${process.env.INITIAL_START}`).subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 00:00:00.000`);
+    endDate = moment(`${process.env.INITIAL_END}`).subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 23:59:59.999`);
   } else {
     startDate = moment().subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 00:00:00.000`);
     endDate = moment().subtract(1, "days").add(7, 'hours').format(`YYYY-MM-DD 23:59:59.999`);
@@ -44,7 +45,7 @@ async function getQuerifiedLead() {
     resultForResponse.message = message
     return resultForResponse;
   }
-  Logger.info(`QuerifiedLead count: ${result.recordset.length}`);
+  Logger.info(`QualifiedLead count: ${result.recordset.length}`);
 
   const mapQuelifiedLead = await mapDataForMeta("qualified", result.recordset);
   let success = 0;
@@ -72,12 +73,12 @@ async function getQuerifiedLead() {
       resultForResponse.response.failed.push({ ...mapQuelifiedLead[i], facebookMessage: response.response?.data?.error })
       Logger.error(`⚠ Failed to request data: ${JSON.stringify(mapQuelifiedLead[i])} \nException : ${JSON.stringify(response.response?.data?.error)}`);
 
-      const checkDuplicate = await CacheData.getData("Lead_Quelified", `${mapQuelifiedLead[i].user_data.lead_id}`);
+      const checkDuplicate = await CacheData.getData("Lead_Qualified", `${mapQuelifiedLead[i].user_data.lead_id}`);
       if (checkDuplicate) {
         Logger.warning(`This leadi_id: ${mapQuelifiedLead[i].user_data.lead_id} is exist in cached`);
       }
       else {
-        const recoveryData = await CacheData.setData("Lead_Quelified", `${moment().format('YYYY-MM-DDTHH:mm:ss')}`, JSON.stringify(mapQuelifiedLead[0]));
+        const recoveryData = await CacheData.setData("Lead_Qualified", `${moment().format('YYYY-MM-DDTHH:mm:ss')}`, JSON.stringify(mapQuelifiedLead[0]));
 
         if (!recoveryData) {
           Logger.error(`Failed to insert Cashe data for: ${mapQuelifiedLead[i].user_data.lead_id}`)
@@ -120,7 +121,7 @@ async function getInitialLead(data) {
         event_time: moment(createdTime).unix(),
         action_source: "system_generated",
         user_data: {
-          lead_id: leadgenId,
+          lead_id: Number(leadgenId),
         },
         custom_data: {
           event_source: "crm",
@@ -181,16 +182,6 @@ async function getInitialLead(data) {
   return result
 }
 
-async function recoveryInitial(oldInitial) {
-  if (!oldInitial) {
-    Logger.warning(`request data for recovery initial lead`)
-    return
-  }
-  // for(i = 0; i < oldInitial.length ; i++) {
-  const mapInitialLead = await mapDataForMeta(Object.values(oldInitial).join(''))
-  // }
-}
-
 /**
  * map data to meta template
  * @param {string} eventName
@@ -198,32 +189,13 @@ async function recoveryInitial(oldInitial) {
  */
 async function mapDataForMeta(eventName, data) {
   try {
-    if (eventName === 'initial_lead') {
-      const reformat = data.map((record) => {
-        return {
-          event_name: eventName,
-          event_time: record.event_time,
-          action_source: "system_generated",
-          user_data: {
-            lead_id: record.lead_id,
-          },
-          custom_data: {
-            event_source: "crm",
-            lead_event_source: "toyota crm",
-          },
-        };
-      });
-
-      Logger.info(`Result =>>  ${eventName}`, reformat);
-      return reformat;
-    }
     const reformat = data.map((record) => {
       return {
         event_name: eventName,
         event_time: moment(record.SendDate).unix(),
         action_source: "system_generated",
         user_data: {
-          lead_id: record.Lead_id,
+          lead_id: Number(record.Lead_id),
         },
         custom_data: {
           event_source: "crm",

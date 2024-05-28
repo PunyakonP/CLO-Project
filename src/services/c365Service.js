@@ -126,7 +126,7 @@ async function downloadBookFile(fileName) {
 
 function getDateFromNow(baseDate, dayOffset) {
   if (baseDate) return moment(baseDate).subtract(dayOffset, 'days').format("DDMMYYYY").toString();
-  return moment().subtract(dayOffset, 'days').format("DDMMYYYY").toString();
+  return moment().subtract(dayOffset, 'days').format("DDMMYYYY").toString();;
 }
 
 function findMatchingBooking(dataList, checkDate) {
@@ -381,7 +381,7 @@ async function deliveryLead() {
       return "Unable to read data from SFTP"
     }
 
-    const mappedDeliverys = await mapDataForMetaDelivery(fileName, "delivery")
+    const mappedDeliverys = await mapDataForMetaDelivery(fileName, "purchase")
     if (!mappedDeliverys || mappedDeliverys.length <= 0) {
       const value = `This delivery: ${fileName} is emtry data at: ${moment().format('DD-MM-YYYY HH:mm:ss')}`
       await saveTransferDelivery(fileName, lastTransfer, value)
@@ -424,11 +424,11 @@ async function mapDataForMetaBooking(csvFileName, eventName) {
         event_time: moment(Date.parse(record.booking_date)).unix(),
         action_source: "system_generated",
         user_data: {
-          lead_id: record.leadgen_id,
+          lead_id: Number(record.leadgen_id),
         },
         custom_data: {
           event_source: "crm",
-          lead_event_source: "toyota crm",
+          lead_event_source: "toyota_crm",
         },
       };
     });
@@ -462,11 +462,11 @@ async function mapDataForMetaDelivery(csvFileName, eventName) {
         event_time: moment(Date.parse(record.delivery_date)).unix(),
         action_source: "system_generated",
         user_data: {
-          lead_id: record.leadgen_id,
+          lead_id: Number(record.leadgen_id),
         },
         custom_data: {
           event_source: "crm",
-          lead_event_source: "toyota crm",
+          lead_event_source: "toyota_crm",
         },
       };
     });

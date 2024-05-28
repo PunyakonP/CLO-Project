@@ -4,6 +4,8 @@ const Logger = require("../helpers/Logger");
 const axios = require("axios");
 const soap = require("soap");
 const serviceLeadConversion = require('../services/leadConversionServies')
+const { createAndUploadFile } = require('../helpers/fileSharre')
+
 
 exports.verifyRequestSignature = async (req, res) => {
   const mode = req.query["hub.mode"];
@@ -43,15 +45,21 @@ exports.webHookFacebook = async (req, res, next) => {
     //   "leadgenId": id,
     // });
 
-    await serviceLeadConversion.getInitialLead({
-      "createdTime": created_time,
-      "leadgenId": id,
-    });
+    if (process.env.WEBHOOK_SEND_TO_META == "Y") {
 
-    Logger.info("Successfully request HTTP API TCAP", {
-      createdTime: created_time,
-      leadgenId: id,
-    });
+      const resultInitial = await serviceLeadConversion.getInitialLead({
+        "createdTime": created_time,
+        "leadgenId": id,
+      });
+
+      await createAndUploadFile(resultInitial, 'trans_quelified_lead')
+
+      Logger.info("Successfully request HTTP API Meta", {
+        createdTime: created_time,
+        leadgenId: id,
+      });
+    }
+
 
     // SOAP Request
     entry.changes.forEach((change) => {
